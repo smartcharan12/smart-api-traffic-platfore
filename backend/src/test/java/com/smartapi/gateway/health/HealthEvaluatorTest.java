@@ -20,9 +20,23 @@ class HealthEvaluatorTest {
     private final Instant start = Instant.parse("2026-01-01T12:00:00Z");
 
     @Test
-    void fastSuccessIsHealthySlowSuccessIsDegraded() {
-        assertThat(HealthEvaluator.next(UNKNOWN, true, 20, 1, 0, t)).isEqualTo(HEALTHY);
-        assertThat(HealthEvaluator.next(HEALTHY, true, 800, 5, 0, t)).isEqualTo(DEGRADED);
+    void fastSuccessIsHealthyAndPersistentSlownessIsDegraded() {
+        assertThat(HealthEvaluator.next(UNKNOWN, true, 20, 1, 0, 0, t)).isEqualTo(HEALTHY);
+        assertThat(HealthEvaluator.next(HEALTHY, true, 800, 5, 0, 1, t)).isEqualTo(HEALTHY);   // one slow probe: noise
+        assertThat(HealthEvaluator.next(HEALTHY, true, 800, 6, 0, 2, t)).isEqualTo(DEGRADED);  // two in a row: real
+        assertThat(HealthEvaluator.next(DEGRADED, true, 800, 7, 0, 3, t)).isEqualTo(DEGRADED);
+        assertThat(HealthEvaluator.next(DEGRADED, true, 20, 8, 0, 0, t)).isEqualTo(HEALTHY);   // fast again
+    }
+
+    @Test
+    void singleSlowProbesDoNotFlapTheStatus() {
+        InstanceHealth health = new InstanceHealth(1, "orders-service", "localhost:9001", UNKNOWN);
+        long[] latencies = {10, 900, 12, 950, 11, 800, 820, 15};
+        List<InstanceStatus> path = new ArrayList<>();
+        for (int i = 0; i < latencies.length; i++) {
+            path.add(health.record(true, latencies[i], null, start.plusSeconds(5L * i), t));
+        }
+        assertThat(path).containsExactly(HEALTHY, HEALTHY, HEALTHY, HEALTHY, HEALTHY, HEALTHY, DEGRADED, HEALTHY);
     }
 
     @Test

@@ -31,6 +31,7 @@ public final class InstanceHealth {
     private Long lastLatencyMs;
     private int consecutiveFailures;
     private int consecutiveSuccesses;
+    private int consecutiveSlow;
     private long totalChecks;
     private long successfulChecks;
     private Instant lastCheckAt;
@@ -57,13 +58,15 @@ public final class InstanceHealth {
             consecutiveFailures = 0;
             lastSuccessAt = now;
             lastError = null;
+            consecutiveSlow = latencyMs > thresholds.degradedLatencyMs() ? consecutiveSlow + 1 : 0;
         } else {
             consecutiveFailures++;
             consecutiveSuccesses = 0;
+            consecutiveSlow = 0;
             lastError = error;
         }
         InstanceStatus next = HealthEvaluator.next(status, success, latencyMs, consecutiveSuccesses,
-                consecutiveFailures, thresholds);
+                consecutiveFailures, consecutiveSlow, thresholds);
         if (next == InstanceStatus.DOWN) {
             upSince = null;
         } else if (upSince == null) {

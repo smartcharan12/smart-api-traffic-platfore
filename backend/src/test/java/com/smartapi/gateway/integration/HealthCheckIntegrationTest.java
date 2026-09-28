@@ -84,10 +84,11 @@ class HealthCheckIntegrationTest extends GatewayTestSupport {
 
         healthCheckService.runChecks();
         assertThat(statusOf(fastId)).isEqualTo("HEALTHY");
-        assertThat(statusOf(slowId)).isEqualTo("DEGRADED");   // answered, but slower than 300 ms
+        assertThat(statusOf(slowId)).isEqualTo("HEALTHY");    // one slow probe could be noise (GC, busy host)
         assertThat(statusOf(deadId)).isEqualTo("DEGRADED");   // 1 failure: suspicious, not yet DOWN
 
         healthCheckService.runChecks();
+        assertThat(statusOf(slowId)).isEqualTo("DEGRADED");   // slower than 300 ms twice in a row
         healthCheckService.runChecks();
         assertThat(statusOf(deadId)).isEqualTo("DOWN");       // 3 consecutive failures
 
