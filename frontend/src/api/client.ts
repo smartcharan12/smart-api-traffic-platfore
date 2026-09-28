@@ -1,5 +1,12 @@
 import type {
+  CircuitBreakersReport,
   CreateInstanceRequest,
+  FailuresReport,
+  GatewaySettings,
+  InstanceHealthReport,
+  Page,
+  RequestLogEntry,
+  TrafficSummary,
   CreateServiceRequest,
   Health,
   InstanceStatus,
@@ -57,6 +64,21 @@ export const api = {
       body: JSON.stringify({ status }),
     }),
   deleteInstance: (id: number) => request<void>(`/api/service-instances/${id}`, { method: 'DELETE' }),
+
+  healthInstances: () => request<InstanceHealthReport>('/api/health/instances'),
+  runHealthChecks: () => request<unknown[]>('/api/health/instances/check', { method: 'POST' }),
+  circuitBreakers: () => request<CircuitBreakersReport>('/api/circuit-breakers'),
+  trafficSummary: (minutes: number) => request<TrafficSummary>(`/api/traffic/summary?minutes=${minutes}`),
+  failures: (minutes: number) => request<FailuresReport>(`/api/traffic/failures?minutes=${minutes}`),
+  settings: () => request<GatewaySettings>('/api/gateway/settings'),
+  requestLogs: (filters: Record<string, string | number | undefined>) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') params.set(k, String(v));
+    });
+    return request<Page<RequestLogEntry>>(`/api/request-logs?${params}`);
+  },
+  requestLogById: (requestId: string) => request<RequestLogEntry[]>(`/api/request-logs/${encodeURIComponent(requestId)}`),
 
   // /api/health answers 503 with a JSON body when a dependency is down, so read the body either way.
   health: async (): Promise<Health | null> => {

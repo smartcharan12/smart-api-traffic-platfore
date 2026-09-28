@@ -1,90 +1,49 @@
-import { useCallback, useEffect, useState } from 'react';
-import { api, ApiError } from './api/client';
-import type { Health, Service, ServiceInstance } from './api/types';
+import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
+import { api } from './api/client';
 import { HealthIndicator } from './components/HealthIndicator';
-import { InstancesTable } from './components/InstancesTable';
-import { RegisterInstanceForm } from './components/RegisterInstanceForm';
-import { RegisterServiceForm } from './components/RegisterServiceForm';
-import { ServicesTable } from './components/ServicesTable';
-import { SummaryCards } from './components/SummaryCards';
+import { usePolling } from './hooks/usePolling';
+import { CircuitBreakersPage } from './pages/CircuitBreakersPage';
+import { FailuresPage } from './pages/FailuresPage';
+import { HealthPage } from './pages/HealthPage';
+import { OverviewPage } from './pages/OverviewPage';
+import { RateLimitPage } from './pages/RateLimitPage';
+import { RequestLogsPage } from './pages/RequestLogsPage';
+import { ServicesPage } from './pages/ServicesPage';
+import { TrafficPage } from './pages/TrafficPage';
 
-// Instance status will start changing on its own once health checks exist (Phase 3), so poll.
-const REFRESH_INTERVAL_MS = 5000;
+const PAGES = [
+  { path: '/', label: 'Overview', element: <OverviewPage /> },
+  { path: '/services', label: 'Services', element: <ServicesPage /> },
+  { path: '/health', label: 'Service health', element: <HealthPage /> },
+  { path: '/traffic', label: 'Traffic', element: <TrafficPage /> },
+  { path: '/rate-limiting', label: 'Rate limiting', element: <RateLimitPage /> },
+  { path: '/failures', label: 'Failures', element: <FailuresPage /> },
+  { path: '/circuit-breakers', label: 'Circuit breakers', element: <CircuitBreakersPage /> },
+  { path: '/logs', label: 'Request logs', element: <RequestLogsPage /> },
+];
 
 export default function App() {
-  const [services, setServices] = useState<Service[]>([]);
-  const [instances, setInstances] = useState<ServiceInstance[]>([]);
-  const [health, setHealth] = useState<Health | null | undefined>(undefined);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  const refresh = useCallback(async () => {
-    setHealth(await api.health());
-    try {
-      const [s, i] = await Promise.all([api.listServices(), api.listInstances()]);
-      setServices(s);
-      setInstances(i);
-      setLoadError(null);
-    } catch (e) {
-      setLoadError(e instanceof ApiError ? e.message : String(e));
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-    const timer = setInterval(() => void refresh(), REFRESH_INTERVAL_MS);
-    return () => clearInterval(timer); // stop polling when the component unmounts
-  }, [refresh]);
-
-  async function runAndRefresh(action: () => Promise<void>) {
-    try {
-      await action();
-    } catch (e) {
-      alert(e instanceof ApiError ? e.message : String(e));
-    }
-    await refresh();
-  }
-
+  const health = usePolling(() => api.health(), 5000);
   return (
-    <div className="app">
-      <header>
-        <h1>Smart API Traffic Platform</h1>
-        <HealthIndicator health={health} />
-      </header>
-
-      {loadError && <p className="banner-error">{loadError}</p>}
-
-      <SummaryCards services={services} instances={instances} />
-
-      <section>
-        <h2>Services</h2>
-        <ServicesTable
-          services={services}
-          instances={instances}
-          onDelete={(s) => {
-            if (confirm(`Delete ${s.name} and all its instances?`)) void runAndRefresh(() => api.deleteService(s.id));
-          }}
-        />
-      </section>
-
-      <section>
-        <h2>Service instances</h2>
-        <InstancesTable
-          instances={instances}
-          onDelete={(i) => {
-            if (confirm(`Remove ${i.host}:${i.port}?`)) void runAndRefresh(() => api.deleteInstance(i.id));
-          }}
-          onStatusChange={(i, status) =>
-            void runAndRefresh(async () => {
-              await api.updateInstanceStatus(i.id, status);
-            })
-          }
-        />
-      </section>
-
-      <section className="forms">
-        <RegisterServiceForm onCreated={() => void refresh()} />
-        <RegisterInstanceForm services={services} onCreated={() => void refresh()} />
-      </section>
-    </div>
+    <BrowserRouter>
+      <div className="app">
+        <header>
+          <h1>Smart API Traffic Platform</h1>
+          <HealthIndicator health={health.data} />
+        </header>
+        <nav className="nav">
+          {PAGES.map((p) => (
+            <NavLink key={p.path} to={p.path} end={p.path === '/'}>
+              {p.label}
+            </NavLink>
+          ))}
+        </nav>
+        <Routes>
+          {PAGES.map((p) => (
+            <Route key={p.path} path={p.path} element={p.element} />
+          ))}
+        </Routes>
+      </div>
+    </BrowserRouter>
   );
 }

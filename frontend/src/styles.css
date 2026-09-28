@@ -209,3 +209,76 @@ button {
   padding: 8px 12px;
   border-radius: 6px;
 }
+
+/* ---- Phase 3: navigation, charts, extra badges ---- */
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.nav a {
+  padding: 8px 12px;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+.nav a.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+button.small {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+button.small:disabled {
+  opacity: 0.5;
+}
+
+td.wrap {
+  white-space: normal;
+  max-width: 360px;
+  word-break: break-all;
+}
+
+.card-good .card-value { color: var(--healthy); }
+.card-warn .card-value { color: var(--degraded); }
+.card-bad .card-value { color: var(--down); }
+
+.badge-circuit-closed { background: var(--healthy); }
+.badge-circuit-half_open { background: var(--degraded); }
+.badge-circuit-open { background: var(--down); }
+
+.status { font-weight: 600; }
+.status-2xx { color: var(--healthy); }
+.status-4xx { color: var(--degraded); }
+.status-5xx { color: var(--down); }
+
+.chart { margin: 0; }
+.chart svg { width: 100%; height: auto; }
+.chart-grid { stroke: var(--border); stroke-width: 1; }
+.chart-axis { fill: var(--muted); font-size: 11px; }
+.chart-legend { display: flex; gap: 16px; font-size: 0.8rem; color: var(--muted); }
+.chart-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
