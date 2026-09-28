@@ -8,6 +8,7 @@ import com.smartapi.gateway.exception.UpstreamTimeoutException;
 import com.smartapi.gateway.exception.UpstreamUnavailableException;
 import com.smartapi.gateway.loadbalancer.BackendInstance;
 import com.smartapi.gateway.loadbalancer.LoadBalancer;
+import com.smartapi.gateway.metrics.GatewayMetrics;
 import com.smartapi.gateway.resilience.CircuitBreaker;
 import com.smartapi.gateway.resilience.CircuitBreakerRegistry;
 import com.smartapi.gateway.resilience.RetryBudget;
@@ -54,10 +55,12 @@ public class ResilientForwarder {
     private final Sleeper sleeper;
     private final DoubleSupplier jitterRandom;
     private final Set<Integer> failureStatuses;
+    private final GatewayMetrics metrics;
 
     public ResilientForwarder(LoadBalancer loadBalancer, ProxyClient proxyClient, CircuitBreakerRegistry breakers,
                               RetryPolicy retryPolicy, RetryBudget retryBudget, RetryDecider retryDecider,
-                              Sleeper retrySleeper, DoubleSupplier jitterRandom, GatewayProperties properties) {
+                              Sleeper retrySleeper, DoubleSupplier jitterRandom, GatewayProperties properties,
+                              GatewayMetrics metrics) {
         this.loadBalancer = loadBalancer;
         this.proxyClient = proxyClient;
         this.breakers = breakers;
@@ -67,6 +70,7 @@ public class ResilientForwarder {
         this.sleeper = retrySleeper;
         this.jitterRandom = jitterRandom;
         this.failureStatuses = Set.copyOf(properties.circuitBreaker().failureStatuses());
+        this.metrics = metrics;
     }
 
     public GatewayResponse forward(GatewayRequest request, Route route, DiscoveredService service,
@@ -144,6 +148,7 @@ public class ResilientForwarder {
             }
             Duration delay = retryPolicy.backoff(attempt, jitterRandom);
             trace.retry();
+            metrics.retry(service.name(), failure.name());
             log.debug("Retrying {} after {} ({} on {})", route.basePath(), delay, failure, target.address());
             try {
                 sleeper.sleep(delay);

@@ -88,6 +88,19 @@ final class GatewayAccessLog {
         this.failures.add(failure);
     }
 
+    /** Registered service name, or "unresolved" (bounded metric label; never the raw path). */
+    String serviceLabel() {
+        return "-".equals(service) ? com.smartapi.gateway.metrics.GatewayMetrics.UNRESOLVED : service;
+    }
+
+    int status() {
+        return status;
+    }
+
+    long elapsedNanos() {
+        return System.nanoTime() - startNanos;
+    }
+
     int attempts() {
         return attempts;
     }

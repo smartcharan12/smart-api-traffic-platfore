@@ -105,4 +105,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # prometheus: scraped by Prometheus (monitoring/prometheus/prometheus.yml)
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: smart-api-gateway   # added to every metric; distinguishes this app in Prometheus

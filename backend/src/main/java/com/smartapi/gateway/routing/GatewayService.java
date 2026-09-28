@@ -8,6 +8,7 @@ import com.smartapi.gateway.exception.RateLimitExceededException;
 import com.smartapi.gateway.exception.RouteNotFoundException;
 import com.smartapi.gateway.loadbalancer.BackendInstance;
 import com.smartapi.gateway.logging.RequestLogWriter;
+import com.smartapi.gateway.metrics.GatewayMetrics;
 import com.smartapi.gateway.ratelimit.RateLimitDecision;
 import com.smartapi.gateway.ratelimit.RateLimitKeyResolver;
 import com.smartapi.gateway.ratelimit.RateLimiter;
@@ -45,11 +46,13 @@ public class GatewayService {
     private final ResponseCachePolicy cachePolicy;
     private final Clock clock;
     private final RequestLogWriter requestLogWriter;
+    private final GatewayMetrics metrics;
 
     public GatewayService(RouteResolver routeResolver, RateLimiter rateLimiter,
                           RateLimitKeyResolver rateLimitKeyResolver, ServiceDiscovery serviceDiscovery,
                           HealthFilter healthFilter, ResilientForwarder forwarder, ResponseCache responseCache,
-                          ResponseCachePolicy cachePolicy, Clock clock, RequestLogWriter requestLogWriter) {
+                          ResponseCachePolicy cachePolicy, Clock clock, RequestLogWriter requestLogWriter,
+                          GatewayMetrics metrics) {
         this.routeResolver = routeResolver;
         this.rateLimiter = rateLimiter;
         this.rateLimitKeyResolver = rateLimitKeyResolver;
@@ -60,6 +63,7 @@ public class GatewayService {
         this.cachePolicy = cachePolicy;
         this.clock = clock;
         this.requestLogWriter = requestLogWriter;
+        this.metrics = metrics;
     }
 
     public GatewayResponse handle(GatewayRequest request) {
@@ -72,12 +76,14 @@ public class GatewayService {
             RateLimitDecision decision = rateLimiter.tryAcquire(key);
             accessLog.rateLimit(decision);
             if (!decision.allowed()) {
+                metrics.rateLimited();
                 throw new RateLimitExceededException(decision);
             }
 
             Optional<String> cacheKey = cachePolicy.keyFor(request, route);
             if (cacheKey.isPresent()) {
                 Optional<ResponseCache.CachedResponse> hit = responseCache.get(cacheKey.get());
+                metrics.cache(hit.isPresent());
                 if (hit.isPresent()) {
                     accessLog.cache("HIT");
                     GatewayResponse cached = fromCache(hit.get());
@@ -117,6 +123,8 @@ public class GatewayService {
             throw e;
         } finally {
             accessLog.write();
+            metrics.recordRequest(accessLog.serviceLabel(), request.method(), accessLog.status(),
+                    accessLog.elapsedNanos());
             try {
                 requestLogWriter.submit(accessLog.toEntity(clock.instant()));
             } catch (RuntimeException e) {
