@@ -14,7 +14,7 @@ public final class TestProperties {
     }
 
     public static GatewayProperties.Proxy proxy() {
-        return new GatewayProperties.Proxy(Duration.ofSeconds(1), Duration.ofSeconds(5));
+        return new GatewayProperties.Proxy(Duration.ofSeconds(1), Duration.ofSeconds(5), 10_485_760);
     }
 
     public static GatewayProperties.RateLimit rateLimit(List<RateLimitDimension> keyBy) {

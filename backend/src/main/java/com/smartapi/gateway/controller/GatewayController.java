@@ -5,12 +5,16 @@ import com.smartapi.gateway.routing.GatewayRequest;
 import com.smartapi.gateway.routing.GatewayResponse;
 import com.smartapi.gateway.routing.GatewayService;
 import com.smartapi.gateway.routing.RouteResolver;
+import com.smartapi.gateway.security.SecurityProperties;
 import com.smartapi.gateway.web.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.regex.Pattern;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,16 +26,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class GatewayController {
 
-    /** Until JWT authentication (Phase 4), the caller identifies itself with this header. It is NOT verified. */
+    /**
+     * Unverified caller identity. Ignored unless security.trust-user-id-header=true (tests/demos):
+     * the real identity is the subject of a verified JWT.
+     */
     public static final String USER_HEADER = "X-User-Id";
     private static final Pattern VALID_USER = Pattern.compile("^[A-Za-z0-9._@-]{1,64}$");
 
     private final GatewayService gatewayService;
     private final ClientIpResolver clientIpResolver;
+    private final boolean trustUserIdHeader;
 
-    public GatewayController(GatewayService gatewayService, ClientIpResolver clientIpResolver) {
+    public GatewayController(GatewayService gatewayService, ClientIpResolver clientIpResolver,
+                             SecurityProperties securityProperties) {
         this.gatewayService = gatewayService;
         this.clientIpResolver = clientIpResolver;
+        this.trustUserIdHeader = securityProperties.trustUserIdHeader();
     }
 
     @RequestMapping(RouteResolver.PREFIX + "/**")
@@ -57,7 +67,19 @@ public class GatewayController {
         return headers;
     }
 
-    private static String userIdOf(HttpServletRequest request) {
+    /**
+     * Identity for per-user rate limits and logs: the subject of a verified JWT (Spring Security has
+     * already rejected invalid tokens), else the X-User-Id header only if explicitly trusted, else none
+     * (anonymous: limited per IP).
+     */
+    private String userIdOf(HttpServletRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof JwtAuthenticationToken jwt) {
+            return jwt.getName();
+        }
+        if (!trustUserIdHeader) {
+            return null;
+        }
         String userId = request.getHeader(USER_HEADER);
         if (userId == null) {
             return null;

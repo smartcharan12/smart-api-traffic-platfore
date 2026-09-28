@@ -130,9 +130,13 @@ class RedisGatewayIntegrationTest extends GatewayTestSupport {
         assertThat(a.hits()).isEqualTo(2);                                  // no Cache-Control -> never stored
 
         a.cacheControl("max-age=60");
-        get("/gateway/orders/orders", "Authorization", "Bearer t", "X-User-Id", "u3");
-        get("/gateway/orders/orders", "Authorization", "Bearer t", "X-User-Id", "u4");
+        String token = "Bearer " + adminToken();                           // a real, valid token
+        assertThat(get("/gateway/orders/orders", "Authorization", token).statusCode()).isEqualTo(200);
+        assertThat(get("/gateway/orders/orders", "Authorization", token).statusCode()).isEqualTo(200);
         assertThat(a.hits()).isEqualTo(4);                                  // Authorization -> not shared
+        // An invalid token is rejected by the gateway before routing (Phase 4 security).
+        assertThat(get("/gateway/orders/orders", "Authorization", "Bearer not-a-jwt").statusCode()).isEqualTo(401);
+        assertThat(a.hits()).isEqualTo(4);
     }
 
     @Test

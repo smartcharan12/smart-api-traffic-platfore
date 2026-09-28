@@ -17,11 +17,13 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** Full stack: HTTP -> controller -> service -> JPA -> real PostgreSQL (schema from Flyway). */
 @SpringBootTest(properties = {"spring.data.redis.url=redis://127.0.0.1:1", "gateway.health-check.enabled=false"})
 @AutoConfigureMockMvc
+@WithMockUser(roles = "ADMIN") // authorization rules themselves are tested in SecurityIntegrationTest
 class RegistryApiIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired

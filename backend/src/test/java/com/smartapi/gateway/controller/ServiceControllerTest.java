@@ -19,6 +19,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import com.smartapi.gateway.config.TimeConfig;
+import com.smartapi.gateway.security.SecurityConfig;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.CannotCreateTransactionException;
 
@@ -27,6 +31,8 @@ import org.springframework.transaction.CannotCreateTransactionException;
  * handler), not the database. Verifies HTTP concerns: status codes, headers, JSON shape, validation.
  */
 @WebMvcTest(ServiceController.class)
+@Import({SecurityConfig.class, TimeConfig.class})
+@WithMockUser(roles = "ADMIN")
 class ServiceControllerTest {
 
     @Autowired

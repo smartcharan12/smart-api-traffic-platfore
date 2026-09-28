@@ -106,10 +106,12 @@ public record GatewayProperties(@Valid @DefaultValue Proxy proxy, @Valid @Defaul
     /**
      * @param connectTimeout  max time to open a TCP connection to an instance
      * @param responseTimeout max time to wait for the instance's response
+     * @param maxResponseBytes larger backend responses become 502 (the body is buffered in memory)
      */
     public record Proxy(
             @DefaultValue("1s") Duration connectTimeout,
-            @DefaultValue("5s") Duration responseTimeout) {
+            @DefaultValue("5s") Duration responseTimeout,
+            @DefaultValue("10485760") @Min(1) int maxResponseBytes) {
     }
 
     /**

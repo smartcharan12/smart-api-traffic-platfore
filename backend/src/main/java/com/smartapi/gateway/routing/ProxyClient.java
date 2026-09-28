@@ -40,10 +40,13 @@ public class ProxyClient {
 
     private final RestClient restClient;
     private final ActiveConnectionTracker connectionTracker;
+    private final int maxResponseBytes;
 
-    public ProxyClient(RestClient gatewayRestClient, ActiveConnectionTracker connectionTracker) {
+    public ProxyClient(RestClient gatewayRestClient, ActiveConnectionTracker connectionTracker,
+                       com.smartapi.gateway.config.GatewayProperties properties) {
         this.restClient = gatewayRestClient;
         this.connectionTracker = connectionTracker;
+        this.maxResponseBytes = properties.proxy().maxResponseBytes();
     }
 
     /**
@@ -62,14 +65,27 @@ public class ProxyClient {
                 spec.body(request.body());
             }
             // exchange() hands us the raw response and, unlike retrieve(), does not throw on 4xx/5xx.
-            return spec.exchange((clientRequest, response) -> new GatewayResponse(
-                    response.getStatusCode().value(),
-                    copyResponseHeaders(response.getHeaders()),
-                    response.getBody().readAllBytes()));
+            return spec.exchange((clientRequest, response) -> {
+                // Read at most max+1 bytes: never buffer an unbounded body in memory.
+                byte[] body = response.getBody().readNBytes(maxResponseBytes + 1);
+                if (body.length > maxResponseBytes) {
+                    throw new ResponseTooLargeException();
+                }
+                return new GatewayResponse(response.getStatusCode().value(),
+                        copyResponseHeaders(response.getHeaders()), body);
+            });
+        } catch (ResponseTooLargeException e) {
+            throw new BadGatewayException(target.address(), e);
         } catch (ResourceAccessException e) {
             throw classify(e, target);
         } finally {
             connectionTracker.release(target.id()); // always, or the count leaks on every failure
+        }
+    }
+
+    private static final class ResponseTooLargeException extends RuntimeException {
+        ResponseTooLargeException() {
+            super("Backend response exceeds the configured maximum size");
         }
     }
 

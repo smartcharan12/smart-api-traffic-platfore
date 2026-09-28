@@ -40,6 +40,7 @@ public class ServiceInstanceService {
                 .orElseThrow(() -> new InvalidRequestException(
                         "serviceId %d does not refer to a registered service".formatted(request.serviceId())));
         String host = request.host().toLowerCase();
+        BackendHostPolicy.check(host);
         if (instanceRepository.existsByServiceIdAndHostAndPort(service.getId(), host, request.port())) {
             throw new DuplicateResourceException("Instance %s:%d is already registered for service '%s'"
                     .formatted(host, request.port(), service.getName()));
