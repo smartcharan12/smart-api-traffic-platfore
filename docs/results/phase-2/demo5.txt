@@ -1,0 +1,47 @@
+Load-balancing comparison produced by tests/load/compare-strategies.sh
+
+=== 1. Sequential (600 requests, concurrency 1), all instances normal ===
+Load test: GET http://localhost:8080/gateway/orders-rr/orders
+  requests=600 concurrency=1 warmup=0
+  total=600 success(2xx)=600 rateLimited(429)=0 failed(other)=0
+  wall time=5.71 s  throughput=105.2 req/s
+  latency ms: avg=9.50 p50=9.25 p95=12.65 p99=15.02 max=75.29
+  status codes: {200=600}
+  served by: {orders-9001=200, orders-9002=200, orders-9003=200}
+Load test: GET http://localhost:8080/gateway/orders-wrr/orders
+  requests=600 concurrency=1 warmup=0
+  total=600 success(2xx)=600 rateLimited(429)=0 failed(other)=0
+  wall time=4.45 s  throughput=135.0 req/s
+  latency ms: avg=7.40 p50=7.12 p95=9.76 p99=11.36 max=66.05
+  status codes: {200=600}
+  served by: {orders-9001=300, orders-9002=200, orders-9003=100}
+Load test: GET http://localhost:8080/gateway/orders-lc/orders
+  requests=600 concurrency=1 warmup=0
+  total=600 success(2xx)=600 rateLimited(429)=0 failed(other)=0
+  wall time=4.05 s  throughput=148.3 req/s
+  latency ms: avg=6.74 p50=6.38 p95=9.39 p99=11.25 max=57.21
+  status codes: {200=600}
+  served by: {orders-9001=200, orders-9002=200, orders-9003=200}
+
+=== 2. Concurrent (600 requests, concurrency 20), instance 9003 slowed to 100 ms ===
+Load test: GET http://localhost:8080/gateway/orders-rr/orders
+  requests=600 concurrency=20 warmup=0
+  total=600 success(2xx)=600 rateLimited(429)=0 failed(other)=0
+  wall time=2.48 s  throughput=242.1 req/s
+  latency ms: avg=80.19 p50=56.11 p95=166.02 p99=200.24 max=282.53
+  status codes: {200=600}
+  served by: {orders-9001=200, orders-9002=200, orders-9003=200}
+Load test: GET http://localhost:8080/gateway/orders-wrr/orders
+  requests=600 concurrency=20 warmup=0
+  total=600 success(2xx)=600 rateLimited(429)=0 failed(other)=0
+  wall time=2.14 s  throughput=280.2 req/s
+  latency ms: avg=67.93 p50=49.62 p95=164.06 p99=179.63 max=250.15
+  status codes: {200=600}
+  served by: {orders-9001=300, orders-9002=200, orders-9003=100}
+Load test: GET http://localhost:8080/gateway/orders-lc/orders
+  requests=600 concurrency=20 warmup=0
+  total=600 success(2xx)=600 rateLimited(429)=0 failed(other)=0
+  wall time=2.31 s  throughput=259.5 req/s
+  latency ms: avg=73.94 p50=60.71 p95=169.60 p99=206.15 max=240.46
+  status codes: {200=600}
+  served by: {orders-9001=283, orders-9002=254, orders-9003=63}

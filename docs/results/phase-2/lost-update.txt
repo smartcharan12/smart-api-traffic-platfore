@@ -1,0 +1,12 @@
+run 1
+plain int ++   expected=8,000,000 actual=1,042,630 lost=6,957,370 time=58 ms
+AtomicInteger  expected=8,000,000 actual=8,000,000 lost=0 time=134 ms
+synchronized   expected=8,000,000 actual=8,000,000 lost=0 time=524 ms
+run 2
+plain int ++   expected=8,000,000 actual=1,043,875 lost=6,956,125 time=65 ms
+AtomicInteger  expected=8,000,000 actual=8,000,000 lost=0 time=150 ms
+synchronized   expected=8,000,000 actual=8,000,000 lost=0 time=561 ms
+run 3
+plain int ++   expected=8,000,000 actual=2,666,292 lost=5,333,708 time=70 ms
+AtomicInteger  expected=8,000,000 actual=8,000,000 lost=0 time=132 ms
+synchronized   expected=8,000,000 actual=8,000,000 lost=0 time=640 ms

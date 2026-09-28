@@ -1,0 +1,53 @@
+NOTE: the 'gateway JVM CPU' % values come from a single top sample and are unreliable;
+see perf-cpu-per-request.txt for CPU measured from /proc (CPU-ms per request).
+
+Same jar, same session. Rate limiting disabled. Route /orders-rr (3 instances, ROUND_ROBIN).
+=== WITHOUT discovery cache (cache-ttl=0: 2 SQL queries per request) ===
+-- no cache, 100 requests, concurrency 20
+  total=100 success(2xx)=100 rateLimited(429)=0 failed(other)=0
+  wall time=0.65 s  throughput=154.7 req/s
+  latency ms: avg=122.84 p50=99.30 p95=241.14 p99=247.22 max=252.04
+  status codes: {200=100}
+-- no cache, 500 requests, concurrency 20
+  total=500 success(2xx)=500 rateLimited(429)=0 failed(other)=0
+  wall time=2.28 s  throughput=219.6 req/s
+  latency ms: avg=90.14 p50=83.51 p95=160.06 p99=210.54 max=214.87
+  status codes: {200=500}
+-- no cache, 1000 requests, concurrency 20
+  total=1000 success(2xx)=1000 rateLimited(429)=0 failed(other)=0
+  wall time=3.91 s  throughput=255.6 req/s
+  latency ms: avg=77.39 p50=73.05 p95=118.87 p99=232.45 max=239.70
+  status codes: {200=1000}
+   (3000-request CPU sample run)  wall time=9.19 s  throughput=326.5 req/s
+   gateway JVM CPU during 3000-request run: 65.2%, RSS 560 MB, threads 88
+=== WITH discovery cache (cache-ttl=5s) ===
+-- cache, 100 requests, concurrency 20
+  total=100 success(2xx)=100 rateLimited(429)=0 failed(other)=0
+  wall time=0.51 s  throughput=196.7 req/s
+  latency ms: avg=95.68 p50=64.71 p95=218.85 p99=223.93 max=226.42
+  status codes: {200=100}
+-- cache, 500 requests, concurrency 20
+  total=500 success(2xx)=500 rateLimited(429)=0 failed(other)=0
+  wall time=1.61 s  throughput=309.8 req/s
+  latency ms: avg=63.30 p50=53.05 p95=98.36 p99=270.19 max=275.95
+  status codes: {200=500}
+-- cache, 1000 requests, concurrency 20
+  total=1000 success(2xx)=1000 rateLimited(429)=0 failed(other)=0
+  wall time=2.76 s  throughput=361.9 req/s
+  latency ms: avg=54.83 p50=47.45 p95=103.81 p99=267.37 max=282.00
+  status codes: {200=1000}
+   (3000-request CPU sample run)  wall time=5.91 s  throughput=508.0 req/s
+   gateway JVM CPU during 3000-request run: 43.5%, RSS 531 MB, threads 93
+=== direct to orders-9001, no gateway (baseline) ===
+-- direct, 100 requests, concurrency 20
+  total=100 success(2xx)=100 rateLimited(429)=0 failed(other)=0
+  wall time=0.31 s  throughput=325.7 req/s
+  latency ms: avg=58.68 p50=18.57 p95=228.42 p99=234.06 max=236.62
+-- direct, 500 requests, concurrency 20
+  total=500 success(2xx)=500 rateLimited(429)=0 failed(other)=0
+  wall time=0.58 s  throughput=861.5 req/s
+  latency ms: avg=22.70 p50=15.02 p95=35.13 p99=190.65 max=196.45
+-- direct, 1000 requests, concurrency 20
+  total=1000 success(2xx)=1000 rateLimited(429)=0 failed(other)=0
+  wall time=0.92 s  throughput=1084.8 req/s
+  latency ms: avg=18.16 p50=13.68 p95=28.36 p99=188.57 max=192.71

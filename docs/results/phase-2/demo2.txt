@@ -1,0 +1,10 @@
+=== Demo 2: /orders (WEIGHTED_ROUND_ROBIN 3/2/1), 60 sequential requests ===
+Load test: GET http://localhost:8080/gateway/orders/orders
+  requests=60 concurrency=1 warmup=0
+  total=60 success(2xx)=60 rateLimited(429)=0 failed(other)=0
+  wall time=0.96 s  throughput=62.2 req/s
+  latency ms: avg=16.02 p50=14.01 p95=18.79 p99=78.74 max=78.74
+  status codes: {200=60}
+  served by: {orders-9001=30, orders-9002=20, orders-9003=10}
+--- first 12 picks, in order ---
+orders-9001 orders-9003 orders-9002 orders-9001 orders-9001 orders-9002 orders-9001 orders-9003 orders-9002 orders-9001 orders-9001 orders-9002 

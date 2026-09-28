@@ -1,0 +1,15 @@
+NOTE: the 'served by' line contains '/gateway/orders-rr/orders=897'. That was a bug in LoadTest.java
+(it read the "instance" field of 429 problem+json bodies). Fixed afterwards; the real backend split of the
+103 allowed requests is orders-9001=35, orders-9002=34, orders-9003=34.
+
+=== Default config: TOKEN_BUCKET, 100 per minute (capacity 100, refill 1.67/s), key-by IP ===
+Load test: GET http://localhost:8080/gateway/orders-rr/orders
+  requests=1000 concurrency=20 warmup=0
+  total=1000 success(2xx)=103 rateLimited(429)=897 failed(other)=0
+  wall time=1.98 s  throughput=505.3 req/s
+  latency ms: avg=39.34 p50=27.52 p95=66.06 p99=481.14 max=488.79
+  status codes: {200=103, 429=897}
+  served by: {/gateway/orders-rr/orders=897, orders-9001=35, orders-9002=34, orders-9003=34}
+backend requests actually served (gateway access log, status=200): 103
+rejected with 429 in access log: 897
+gateway-internal latency of rejected requests: avg=0.18 ms, p99=5 ms

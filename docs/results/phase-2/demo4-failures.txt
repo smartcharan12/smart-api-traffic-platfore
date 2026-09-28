@@ -1,0 +1,40 @@
+=== Demo 4a: kill orders-9003 (still registered, status UNKNOWN) ===
+stopped :9003
+Load test: GET http://localhost:8080/gateway/orders/orders
+  requests=60 concurrency=1 warmup=0
+  total=60 success(2xx)=60 rateLimited(429)=0 failed(other)=0
+  wall time=0.70 s  throughput=86.0 req/s
+  latency ms: avg=11.57 p50=10.48 p95=16.20 p99=68.56 max=68.56
+  status codes: {200=60}
+  served by: {orders-9001=37, orders-9002=23}
+  refused connections to 9003 during the run (from gateway log): 11
+WARN [6347a30d-0d1e-462a-9536-0c8fec91941e] 19317 --- [smart-api-gateway] [nio-8080-exec-2] c.s.gateway.routing.GatewayService       : Connection to localhost:9
+
+=== Demo 4b: mark 9003 DOWN via PATCH ===
+"port":9003,"weight":1,"status":"DOWN"
+Load test: GET http://localhost:8080/gateway/orders/orders
+  requests=60 concurrency=1 warmup=0
+  total=60 success(2xx)=60 rateLimited(429)=0 failed(other)=0
+  wall time=0.51 s  throughput=116.6 req/s
+  latency ms: avg=8.53 p50=7.24 p95=10.86 p99=65.85 max=65.85
+  status codes: {200=60}
+  served by: {orders-9001=36, orders-9002=24}
+  refused connections to 9003 during the run: 0
+
+=== Demo 4c: restart 9003, mark HEALTHY: traffic returns ===
+  served by: {orders-9001=30, orders-9002=20, orders-9003=10}
+
+=== Case 2: orders-9002 returns HTTP 500 (chaos ERROR) ===
+  status codes: {200=40, 500=20}
+  served by: {orders-9001=30, orders-9002=20, orders-9003=10}
+
+=== Case 4: orders-9001 takes 6 s, gateway response timeout is 5 s ===
+  HTTP 200 in 0.006464s
+  HTTP 504 in 5.008987s
+  HTTP 200 in 0.006848s
+
+=== Case 5: every orders instance DOWN ===
+{"type":"about:blank","title":"Service unavailable","status":503,"detail":"All 3 instances of service 'orders-service' are DOWN","instance":"/gateway/orders/orders","requestId":"b0d8f4ca-e15b-4322-9563-ef4701c650b2"}  -> HTTP 503
+=== Case 5b: all instances marked HEALTHY but all processes stopped ===
+{"type":"about:blank","title":"Service unavailable","status":503,"detail":"Could not connect to any instance of 'orders-service' (3 attempted)","instance":"/gateway/orders/orders","requestId":"3c8949a1-cb8b-44fd-a0e1-39119df2b9ea"}  -> HTTP 503 in 0.009071s
+(orders instances restarted)

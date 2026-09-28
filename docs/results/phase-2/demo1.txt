@@ -1,0 +1,12 @@
+++ curl -s -i localhost:8080/gateway/orders/orders/2 -H 'X-Request-ID: demo-trace-0001'
+HTTP/1.1 200 
+X-Request-ID: demo-trace-0001
+date: Mon, 28 Sep 2026 15:31:00 GMT
+Content-Type: application/json
+Content-Length: 196
+
+{"service":"orders-service","instance":"orders-9001","message":"Request handled successfully","requestId":"demo-trace-0001","data":{"item":"Paneer Tikka","id":2,"status":"PREPARING","quantity":1}}++ curl -s -X POST localhost:8080/gateway/payments/payments -H 'Content-Type: application/json' -d '{"orderId":2,"amount":349.0}'
+{"service":"payments-service","instance":"payments-9101","message":"Payment captured","requestId":"1cfdf470-60d8-4137-9b27-ee06d1eb2865","data":{"id":1,"status":"CAPTURED","orderId":2,"amount":349.0}}++ curl -s localhost:8080/gateway/restaurants/restaurants/1
+{"service":"restaurant-service","instance":"restaurant-9201","message":"Request handled successfully","requestId":"c9665c52-9e18-43c8-9c1a-90987ae0ae71","data":{"id":1,"name":"Udupi Grand","cuisine":"South Indian","rating":4.5}}++ curl -s -w ' -> HTTP %{http_code}' localhost:8080/gateway/orders/orders/99
+{"service":"orders-service","instance":"orders-9002","message":"Order 99 not found","requestId":"80a429e4-b764-41d1-9881-655f5c1a7ba2","data":null} -> HTTP 404++ curl -s -w ' -> HTTP %{http_code}' localhost:8080/gateway/unknown/x
+{"type":"about:blank","title":"Route not found","status":404,"detail":"No service is registered for path '/unknown'","instance":"/gateway/unknown/x","requestId":"a186a79f-6468-4d33-b645-9e5744375789"} -> HTTP 404

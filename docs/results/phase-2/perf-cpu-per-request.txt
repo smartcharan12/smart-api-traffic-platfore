@@ -1,0 +1,5 @@
+3000 requests, concurrency 20, after a 3000-request warmup; two measured runs each
+  no cache  run 1: throughput=351.8 req/s, avg=56.73ms avg, gateway CPU 12.42 ms per request
+  no cache  run 2: throughput=396.0 req/s, avg=50.39ms avg, gateway CPU 10.79 ms per request
+  with cache run 1: throughput=574.3 req/s, avg=34.74ms avg, gateway CPU 6.47 ms per request
+  with cache run 2: throughput=638.8 req/s, avg=31.17ms avg, gateway CPU 5.89 ms per request

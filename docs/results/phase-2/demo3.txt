@@ -1,0 +1,18 @@
+=== Demo 3: SLIDING_WINDOW, 5 requests / 10 s, key-by IP ===
+request 1 -> HTTP/1.1 200   remaining=4 
+request 2 -> HTTP/1.1 200   remaining=3 
+request 3 -> HTTP/1.1 200   remaining=2 
+request 4 -> HTTP/1.1 200   remaining=1 
+request 5 -> HTTP/1.1 200   remaining=0 
+request 6 -> HTTP/1.1 429   remaining=0 Retry-After: 10
+429 body: {"type":"about:blank","title":"Too many requests","status":429,"detail":"Rate limit of 5 requests exceeded; retry after 10 s","instance":"/gateway/orders/orders","requestId":"697b5726-5e2b-447c-970a-a1aac8ee20d0"}
+... waiting 10 s for the window to slide ...
+request 7 (after 10 s) -> HTTP 200
+--- access log ---
+requestId=28a71642-693e-4822-9280-e6c963c483e5 path=/gateway/orders/orders status=200 rateLimit=ALLOWED remaining=4 
+requestId=400804cd-1a99-4ccc-b1f1-3f8d68fb5361 path=/gateway/orders/orders status=200 rateLimit=ALLOWED remaining=3 
+requestId=3bbe8f46-4772-479b-bf91-39bb3a50b8bf path=/gateway/orders/orders status=200 rateLimit=ALLOWED remaining=2 
+requestId=7a6dd287-3aa5-4ae5-aa78-fb409adf189c path=/gateway/orders/orders status=200 rateLimit=ALLOWED remaining=1 
+requestId=f32e8cbd-adb6-4f77-b0f7-6c343d756e2b path=/gateway/orders/orders status=200 rateLimit=ALLOWED remaining=0 
+requestId=697b5726-5e2b-447c-970a-a1aac8ee20d0 path=/gateway/orders/orders status=429 rateLimit=REJECTED remaining=0 
+requestId=c0b8d3e8-9ee5-4318-8c66-fedb81da437d path=/gateway/orders/orders status=200 rateLimit=ALLOWED remaining=4 
