@@ -41,16 +41,25 @@ public class TrafficStatsService {
                        percentile_cont(0.99) WITHIN GROUP (ORDER BY latency_ms) AS p99_ms
                 FROM request_logs WHERE created_at >= ?
                 """, since);
+        // generate_series produces EVERY minute of the window, so quiet minutes appear as 0 instead of
+        // being skipped (a chart would otherwise draw 03:55 and 04:02 as neighbours).
         List<Map<String, Object>> perMinute = jdbc.queryForList("""
-                SELECT date_trunc('minute', created_at)               AS minute,
-                       count(*)                                         AS total,
-                       count(*) FILTER (WHERE status_code >= 500)      AS server_errors,
-                       count(*) FILTER (WHERE status_code = 429)       AS rate_limited,
-                       round(avg(latency_ms)::numeric, 1)              AS avg_latency_ms,
-                       percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95_ms
-                FROM request_logs WHERE created_at >= ?
-                GROUP BY 1 ORDER BY 1
-                """, since);
+                WITH minutes AS (
+                    SELECT generate_series(date_trunc('minute', ?::timestamptz),
+                                           date_trunc('minute', ?::timestamptz), interval '1 minute') AS minute
+                )
+                SELECT m.minute,
+                       count(l.id)                                      AS total,
+                       count(l.id) FILTER (WHERE l.status_code >= 500) AS server_errors,
+                       count(l.id) FILTER (WHERE l.status_code = 429)  AS rate_limited,
+                       round(avg(l.latency_ms)::numeric, 1)            AS avg_latency_ms,
+                       percentile_cont(0.95) WITHIN GROUP (ORDER BY l.latency_ms) AS p95_ms
+                FROM minutes m
+                LEFT JOIN request_logs l
+                       ON l.created_at >= m.minute AND l.created_at < m.minute + interval '1 minute'
+                      AND l.created_at >= ?
+                GROUP BY m.minute ORDER BY m.minute
+                """, since, Timestamp.from(clock.instant()), since);
         List<Map<String, Object>> byService = jdbc.queryForList("""
                 SELECT coalesce(s.name, '(no service)')                 AS service,
                        count(*)                                         AS total,

@@ -111,6 +111,16 @@ class RequestLogIntegrationTest extends GatewayTestSupport {
                 .contains("\"retries\":" + totalRetries)
                 .contains("\"p95_ms\"").contains("\"perMinute\"").contains("\"byService\"");
 
+        // Every minute of the window is present, with zeros for quiet minutes (no gaps in charts).
+        com.fasterxml.jackson.databind.JsonNode perMinute = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(summary).get("perMinute");
+        assertThat(perMinute.size()).isBetween(5, 6);           // a 5-minute window spans 5 or 6 minute buckets
+        int sum = 0;
+        for (com.fasterxml.jackson.databind.JsonNode m : perMinute) {
+            sum += m.get("total").asInt();
+        }
+        assertThat(sum).isEqualTo(7);
+
         String clientErrors = get("/api/request-logs?statusClass=4").body();
         assertThat(clientErrors).contains("\"totalElements\":2");            // the 404 and the 429
     }
