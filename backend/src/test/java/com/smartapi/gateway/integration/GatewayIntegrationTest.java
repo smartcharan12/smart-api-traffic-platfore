@@ -27,7 +27,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "gateway.rate-limit.enabled=false",
         "gateway.proxy.connect-timeout=500ms",
-        "gateway.proxy.response-timeout=500ms"})
+        "gateway.proxy.response-timeout=500ms",
+        "gateway.circuit-breaker.enabled=true"})
 class GatewayIntegrationTest extends GatewayTestSupport {
 
     @LocalServerPort
@@ -208,11 +209,11 @@ class GatewayIntegrationTest extends GatewayTestSupport {
 
         HttpResponse<String> response = get("/gateway/orders/orders");
         assertThat(response.statusCode()).isEqualTo(503);
-        assertThat(response.body()).contains("Could not connect to any instance of 'orders-service' (2 attempted)");
+        assertThat(response.body()).contains("Could not connect to any instance of 'orders-service'");
     }
 
     @Test
-    void slowBackendReturns504AfterResponseTimeout() throws Exception {
+    void slowBackendReturns504AfterResponseTimeoutAndIdempotentGetIsRetried() throws Exception {
         StubBackend a = backend("A");
         a.mode(StubBackend.Mode.SLOW, 3000);
         registerInstance(registerService("orders-service", "/orders", "ROUND_ROBIN"), a.port(), 1);
@@ -222,8 +223,21 @@ class GatewayIntegrationTest extends GatewayTestSupport {
         long elapsedMs = (System.nanoTime() - start) / 1_000_000;
 
         assertThat(response.statusCode()).isEqualTo(504);
-        assertThat(elapsedMs).isLessThan(2500); // gave up at ~500 ms, didn't wait the full 3 s
-        assertThat(a.hits()).isEqualTo(1);      // a timeout is not retried on another instance
+        // 3 attempts x 500 ms timeout + ~100 ms + ~200 ms backoff; far less than one 3 s wait per attempt
+        assertThat(elapsedMs).isBetween(1500L, 2900L);
+        assertThat(a.hits()).isEqualTo(3); // GET is idempotent, so the timeout was retried (Phase 3)
+    }
+
+    @Test
+    void timedOutPostIsNotRetriedBecauseItMayHaveBeenProcessed() throws Exception {
+        StubBackend a = backend("A");
+        a.mode(StubBackend.Mode.SLOW, 3000);
+        registerInstance(registerService("payments-service", "/payments", "ROUND_ROBIN"), a.port(), 1);
+
+        HttpResponse<String> response = send("POST", "/gateway/payments/payments", "{\"orderId\":1}");
+
+        assertThat(response.statusCode()).isEqualTo(504);
+        assertThat(a.hits()).isEqualTo(1);
     }
 
     @Test

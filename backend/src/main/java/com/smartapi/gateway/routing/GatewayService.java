@@ -1,21 +1,14 @@
 package com.smartapi.gateway.routing;
 
-import com.smartapi.gateway.config.GatewayProperties;
 import com.smartapi.gateway.exception.GatewayException;
 import com.smartapi.gateway.exception.NoHealthyInstanceException;
 import com.smartapi.gateway.exception.RateLimitExceededException;
 import com.smartapi.gateway.exception.RouteNotFoundException;
-import com.smartapi.gateway.exception.UpstreamUnavailableException;
 import com.smartapi.gateway.loadbalancer.BackendInstance;
-import com.smartapi.gateway.loadbalancer.LoadBalancer;
 import com.smartapi.gateway.ratelimit.RateLimitDecision;
 import com.smartapi.gateway.ratelimit.RateLimitKeyResolver;
 import com.smartapi.gateway.ratelimit.RateLimiter;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 
@@ -26,10 +19,9 @@ import org.springframework.stereotype.Service;
  *  2. RateLimiter        may this client send another request?                             (429)
  *  3. ServiceDiscovery   which instances does "/orders" have?                              (404 if no service)
  *  4. HealthFilter       drop DOWN instances                                               (503 if none left)
- *  5. LoadBalancer       pick one instance with the service's strategy
- *  6. ProxyClient        forward and return the instance's response                        (502 / 504)
- *     - connection refused -> mark that instance as tried, go back to 5 with the rest     (503 if all fail)
- *  7. GatewayAccessLog   one structured log line, whatever happened
+ *  5. ResilientForwarder circuit breaker -> load balancer -> proxy, with retries          (503 circuit open)
+ *                        returns the backend's response, or 502 / 503 / 504 when none was obtained
+ *  6. GatewayAccessLog   one structured log line, whatever happened
  * </pre>
  * Rate limiting runs before discovery on purpose: a rejected request costs a map lookup instead of two
  * SQL queries, so a flood of requests cannot turn into a flood of database load.
@@ -37,29 +29,22 @@ import org.springframework.stereotype.Service;
 @Service
 public class GatewayService {
 
-    private static final Logger log = LoggerFactory.getLogger(GatewayService.class);
-
     private final RouteResolver routeResolver;
     private final RateLimiter rateLimiter;
     private final RateLimitKeyResolver rateLimitKeyResolver;
     private final ServiceDiscovery serviceDiscovery;
     private final HealthFilter healthFilter;
-    private final LoadBalancer loadBalancer;
-    private final ProxyClient proxyClient;
-    private final int maxConnectAttempts;
+    private final ResilientForwarder forwarder;
 
     public GatewayService(RouteResolver routeResolver, RateLimiter rateLimiter,
                           RateLimitKeyResolver rateLimitKeyResolver, ServiceDiscovery serviceDiscovery,
-                          HealthFilter healthFilter, LoadBalancer loadBalancer, ProxyClient proxyClient,
-                          GatewayProperties properties) {
+                          HealthFilter healthFilter, ResilientForwarder forwarder) {
         this.routeResolver = routeResolver;
         this.rateLimiter = rateLimiter;
         this.rateLimitKeyResolver = rateLimitKeyResolver;
         this.serviceDiscovery = serviceDiscovery;
         this.healthFilter = healthFilter;
-        this.loadBalancer = loadBalancer;
-        this.proxyClient = proxyClient;
-        this.maxConnectAttempts = properties.proxy().maxConnectAttempts();
+        this.forwarder = forwarder;
     }
 
     public GatewayResponse handle(GatewayRequest request) {
@@ -84,8 +69,9 @@ public class GatewayService {
                 throw new NoHealthyInstanceException(service.name(), service.instances().size());
             }
 
-            GatewayResponse response = forwardWithFailover(request, route, service, routable, accessLog);
+            GatewayResponse response = forwarder.forward(request, route, service, routable, accessLog);
             addRateLimitHeaders(response.headers(), decision);
+            response.headers().set("X-Retry-Count", String.valueOf(accessLog.retries()));
             accessLog.status(response.status());
             return response;
         } catch (GatewayException e) {
@@ -99,32 +85,6 @@ public class GatewayService {
         } finally {
             accessLog.write();
         }
-    }
-
-    /**
-     * Tries up to {@code maxConnectAttempts} different instances, but only moves on when the connection
-     * could not be opened. A timeout or broken response is NOT retried here, because the backend
-     * may already have acted on the request.
-     */
-    private GatewayResponse forwardWithFailover(GatewayRequest request, Route route, DiscoveredService service,
-                                                List<BackendInstance> routable, GatewayAccessLog accessLog) {
-        Set<Long> refused = new HashSet<>();
-        int attempts = Math.min(maxConnectAttempts, routable.size());
-        for (int attempt = 1; attempt <= attempts; attempt++) {
-            List<BackendInstance> candidates = refused.isEmpty()
-                    ? routable
-                    : routable.stream().filter(instance -> !refused.contains(instance.id())).toList();
-            BackendInstance target = loadBalancer.choose(service.strategy(), service.id(), candidates);
-            accessLog.attempt(target.address());
-            try {
-                return proxyClient.forward(target, request, route.downstreamPath());
-            } catch (UpstreamConnectException e) {
-                log.warn("Connection to {} failed (attempt {}/{}): {}", target.address(), attempt, attempts,
-                        e.getCause().getClass().getSimpleName());
-                refused.add(target.id());
-            }
-        }
-        throw new UpstreamUnavailableException(service.name(), refused.size());
     }
 
     private static void addRateLimitHeaders(HttpHeaders headers, RateLimitDecision decision) {

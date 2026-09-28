@@ -6,12 +6,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.smartapi.gateway.config.GatewayProperties;
 import com.smartapi.gateway.entity.LoadBalancingStrategyType;
-import com.smartapi.gateway.ratelimit.RateLimitAlgorithm;
-import com.smartapi.gateway.ratelimit.RateLimitDimension;
 import com.smartapi.gateway.service.RegistryChangedEvent;
 import com.smartapi.gateway.support.MutableClock;
+import com.smartapi.gateway.support.TestProperties;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -25,11 +23,7 @@ class ServiceDiscoveryTest {
             new DiscoveredService(1, "orders-service", "/orders", LoadBalancingStrategyType.ROUND_ROBIN, List.of());
 
     private ServiceDiscovery discoveryWithTtl(Duration ttl) {
-        return new ServiceDiscovery(lookup, clock, new GatewayProperties(
-                new GatewayProperties.Proxy(Duration.ofSeconds(1), Duration.ofSeconds(5), 3),
-                new GatewayProperties.RateLimit(false, RateLimitAlgorithm.TOKEN_BUCKET, 100, Duration.ofMinutes(1),
-                        List.of(RateLimitDimension.IP), false),
-                new GatewayProperties.Discovery(ttl)));
+        return new ServiceDiscovery(lookup, clock, TestProperties.withDiscoveryTtl(ttl));
     }
 
     @Test

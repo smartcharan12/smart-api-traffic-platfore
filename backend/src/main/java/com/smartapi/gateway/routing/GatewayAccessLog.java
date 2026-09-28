@@ -24,6 +24,8 @@ final class GatewayAccessLog {
     private String service = "-";
     private String instance = "-";
     private int attempts;
+    private int retries;
+    private final java.util.List<String> failures = new java.util.ArrayList<>();
     private int status;
     private String rateLimit = "-";
     private String remaining = "-";
@@ -40,6 +42,22 @@ final class GatewayAccessLog {
     void attempt(String address) {
         this.instance = address;
         this.attempts++;
+    }
+
+    void retry() {
+        this.retries++;
+    }
+
+    void failure(String failure) {
+        this.failures.add(failure);
+    }
+
+    int attempts() {
+        return attempts;
+    }
+
+    int retries() {
+        return retries;
     }
 
     void status(int status) {
@@ -62,10 +80,10 @@ final class GatewayAccessLog {
     void write() {
         long latencyMs = (System.nanoTime() - startNanos) / 1_000_000;
         String line = "requestId=%s method=%s path=%s client=%s user=%s service=%s instance=%s attempts=%d "
-                + "status=%d latencyMs=%d rateLimit=%s remaining=%s error=%s";
+                + "retries=%d status=%d latencyMs=%d rateLimit=%s remaining=%s failures=%s error=%s";
         Object[] args = {RequestIdFilter.currentRequestId(), request.method(), request.path(), request.clientIp(),
-                request.userId() == null ? "-" : request.userId(), service, instance, attempts, status, latencyMs,
-                rateLimit, remaining, error};
+                request.userId() == null ? "-" : request.userId(), service, instance, attempts, retries, status,
+                latencyMs, rateLimit, remaining, failures.isEmpty() ? "-" : String.join(",", failures), error};
         if (status >= 500) {
             log.warn(line.formatted(args));
         } else {

@@ -19,21 +19,49 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "gateway")
 public record GatewayProperties(@Valid @DefaultValue Proxy proxy, @Valid @DefaultValue RateLimit rateLimit,
-                                @Valid @DefaultValue Discovery discovery) {
+                                @Valid @DefaultValue Discovery discovery,
+                                @Valid @DefaultValue CircuitBreaker circuitBreaker,
+                                @Valid @DefaultValue Retry retry) {
+
+    /**
+     * Per-backend circuit breaker. {@code failureStatuses} are backend responses that count as failures
+     * (the backend answered, but is unhealthy); connection errors, timeouts and 502s always count.
+     */
+    public record CircuitBreaker(
+            @DefaultValue("true") boolean enabled,
+            @DefaultValue("10") @Min(1) int slidingWindowSize,
+            @DefaultValue("5") @Min(1) int minimumCalls,
+            @DefaultValue("50") @Min(1) @Max(100) int failureRateThreshold,
+            @DefaultValue("10s") Duration openDuration,
+            @DefaultValue("2") @Min(1) int halfOpenPermittedCalls,
+            @DefaultValue("500,502,503,504") List<Integer> failureStatuses) {
+    }
+
+    /**
+     * @param maxAttempts total attempts per client request, including the first (1 disables retries)
+     * @param budgetRatio retries allowed per client request on average (0.2 = at most ~20% extra load)
+     */
+    public record Retry(
+            @DefaultValue("3") @Min(1) @Max(10) int maxAttempts,
+            @DefaultValue("100ms") Duration initialBackoff,
+            @DefaultValue("2.0") double multiplier,
+            @DefaultValue("1s") Duration maxBackoff,
+            @DefaultValue("0.2") double jitter,
+            @DefaultValue("0.2") double budgetRatio,
+            @DefaultValue("20") @Min(1) int budgetMaxTokens) {
+    }
 
     /** @param cacheTtl how long a route lookup is reused before re-reading the registry; 0 disables caching */
     public record Discovery(@DefaultValue("5s") Duration cacheTtl) {
     }
 
     /**
-     * @param connectTimeout     max time to open a TCP connection to an instance
-     * @param responseTimeout    max time to wait for the instance's response
-     * @param maxConnectAttempts how many different instances to try when connections are refused
+     * @param connectTimeout  max time to open a TCP connection to an instance
+     * @param responseTimeout max time to wait for the instance's response
      */
     public record Proxy(
             @DefaultValue("1s") Duration connectTimeout,
-            @DefaultValue("5s") Duration responseTimeout,
-            @DefaultValue("3") @Min(1) @Max(10) int maxConnectAttempts) {
+            @DefaultValue("5s") Duration responseTimeout) {
     }
 
     /**

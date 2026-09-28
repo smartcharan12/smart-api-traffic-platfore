@@ -42,7 +42,22 @@ gateway:
   proxy:
     connect-timeout: 1s        # opening a TCP connection to an instance
     response-timeout: 5s       # waiting for the instance to answer -> 504 when exceeded
-    max-connect-attempts: 3    # instances to try when connections are refused -> 503 when all fail
+  circuit-breaker:             # per backend address; see resilience/CircuitBreaker
+    enabled: true
+    sliding-window-size: 10    # decide on the last 10 calls
+    minimum-calls: 5
+    failure-rate-threshold: 50 # percent -> OPEN
+    open-duration: 10s         # reject calls, then allow trial calls (HALF_OPEN)
+    half-open-permitted-calls: 2
+    failure-statuses: 500,502,503,504
+  retry:                       # see resilience/RetryDecider for what is retried
+    max-attempts: 3            # 1 try + up to 2 retries (1 disables retries)
+    initial-backoff: 100ms     # 100 ms, 200 ms, 400 ms ... each +/- jitter
+    multiplier: 2.0
+    max-backoff: 1s
+    jitter: 0.2
+    budget-ratio: 0.2          # retries capped at ~20% of requests (retry-storm protection)
+    budget-max-tokens: 20
   discovery:
     cache-ttl: 5s              # reuse route lookups; registry changes via this gateway apply immediately
   rate-limit:

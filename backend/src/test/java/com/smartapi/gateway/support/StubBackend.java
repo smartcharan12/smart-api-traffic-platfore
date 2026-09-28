@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class StubBackend implements AutoCloseable {
 
-    public enum Mode { OK, ERROR, SLOW }
+    public enum Mode { OK, ERROR, UNAVAILABLE, SLOW }
 
     private final String name;
     private final HttpServer server;
@@ -64,7 +64,8 @@ public final class StubBackend implements AutoCloseable {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");
         exchange.getResponseHeaders().set("X-Backend", name);
-        exchange.sendResponseHeaders(mode == Mode.ERROR ? 500 : 200, bytes.length);
+        int status = switch (mode) { case ERROR -> 500; case UNAVAILABLE -> 503; default -> 200; };
+        exchange.sendResponseHeaders(status, bytes.length);
         exchange.getResponseBody().write(bytes);
         exchange.close();
     }
