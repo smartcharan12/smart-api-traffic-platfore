@@ -1,0 +1,23 @@
+# Phase 1: only PostgreSQL. Backend, frontend, Redis, Prometheus and Grafana are added in later phases.
+# Usage:  cp .env.example .env   (edit DB_PASSWORD)   then   docker compose up -d postgres
+name: smart-api-platform
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: smart_api
+      POSTGRES_USER: ${DB_USERNAME:-smart_api}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
