@@ -110,9 +110,46 @@ Design rules:
 - **Package dependencies are acyclic.** `BackendInstance` lives in `loadbalancer` so that
   `routing → loadbalancer` is one-way.
 
-Still planned: circuit breaker and retry engine (Phase 3) between the load balancer and the proxy,
-Redis-backed rate-limit state, automatic health checks that update instance status, persisted request
-logs, and metrics.
+## Phase 3: built
+
+```mermaid
+flowchart LR
+    subgraph GW["Gateway process (any number of these)"]
+        direction TB
+        PIPE["GatewayService pipeline"] --> RF["ResilientForwarder<br/>circuit breakers + retries"]
+        HC["HealthCheckService<br/>probe pool (8 threads)"]
+        RLW["RequestLogWriter<br/>bounded queue → batch writer"]
+        MET["GatewayMetrics<br/>(Micrometer)"]
+    end
+    PIPE <-->|"Lua: rl:*<br/>cache: rc:*"| REDIS[("Redis")]
+    HC <-->|"leader lease"| REDIS
+    REDIS -->|"pub/sub:<br/>registry changes"| PIPE
+    HC -->|"status, heartbeats"| PG[("PostgreSQL")]
+    RLW -->|"request_logs"| PG
+    RF --> BE["Backends"]
+    HC -->|"GET /health"| BE
+    PROM["Prometheus"] -->|"scrape /actuator/prometheus"| MET
+    GRAF["Grafana"] --> PROM
+    DASH["React dashboard"] -->|"/api/*"| GW
+```
+
+| Package | Responsibility |
+|---|---|
+| `resilience` | `CircuitBreaker` (state machine), registry, `RetryPolicy` / `RetryBudget` / `RetryDecider` |
+| `redis` | `RedisGuard` (circuit breaker around Redis), `LeaderLock`, pub/sub broadcaster and subscription |
+| `cache` | response-cache interface, Redis implementation, HTTP caching rules |
+| `health` | active probes, status rules with hysteresis, per-instance records, combined report |
+| `logging` | request-log pipeline, queries, traffic statistics, retention |
+| `metrics` | Prometheus metrics |
+
+**What is shared and what is per process.** Shared through PostgreSQL: registry, instance status,
+heartbeats, request logs. Shared through Redis: rate-limit budgets, response cache, leader lease,
+invalidation messages. Per gateway process, by design: circuit-breaker state, active-connection
+counts, discovery cache, Prometheus metrics (Prometheus aggregates them).
+
+**Failure of shared dependencies.** Database down → `/api/health` 503, proxying of cached routes
+continues until the discovery TTL expires. Redis down → the gateway keeps working with local
+fallbacks (`/api/health` reports DEGRADED).
 
 ## Repository layout
 
@@ -124,7 +161,8 @@ logs, and metrics.
 | `docs/` | Architecture and per-phase learning guides | 1 |
 | `services/` | Demo backend services with failure-injection switches | 2 |
 | `scripts/` | Start/stop/register the demo services | 2 |
-| `monitoring/` | Prometheus and Grafana configuration | 3 |
+| `monitoring/` | Prometheus scrape config, Grafana provisioning and dashboard | 3 |
+| `legacy/` | Pre-rewrite copies of replaced files, not built | 3 |
 | `docker/` | Dockerfiles and container configuration | 4 |
 | `tests/` | Load tests against the running stack (`LoadTest.java` in Phase 2; k6 and failure scripts in Phase 4) | 2, 4 |
 | `docs/results/` | Raw output of every measurement quoted in the docs | 2 |

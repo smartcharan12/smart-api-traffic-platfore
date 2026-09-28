@@ -1,7 +1,8 @@
 # Smart API Traffic & Failure Management Platform
 
 An API gateway that manages traffic to backend services: service registry, rate limiting, load
-balancing, failure handling, and later circuit breaking, retries, health monitoring and metrics. It is
+balancing, circuit breaking, retries, shared state in Redis, health monitoring, request logs and
+Prometheus/Grafana metrics. It is
 built in four phases as a learning project, and **this README only describes what is implemented so
 far**. Anything marked *Planned* does not exist yet. The complete README is written at the end of
 Phase 4.
@@ -12,7 +13,7 @@ Phase 4.
 |---|---|---|
 | 1. Foundation & core backend | Service registry (PostgreSQL), REST APIs, health endpoint, React dashboard | **Implemented** |
 | 2. Intelligent traffic management | Gateway proxy, 3 rate limiters, 3 load balancers, health filtering, failure handling, request IDs, demo services | **Implemented** |
-| 3. Distributed features & monitoring | Circuit breaker, retry engine (backoff + jitter), Redis-backed rate limits, automatic health checks, persisted request logs, Prometheus/Grafana, dashboard pages | Planned |
+| 3. Distributed features & monitoring | Circuit breaker, retry engine, Redis (shared rate limits, response cache, pub/sub invalidation, leader election), automatic health checks, persisted request logs, Prometheus/Grafana, 8-page dashboard | **Implemented** |
 | 4. Productionisation | Testcontainers, failure-simulation demo, Docker for all components, CI/CD, k6 load tests, JWT security | Planned |
 
 ## What works today
@@ -33,7 +34,46 @@ Phase 4.
 - Gateway error codes: 400, 404, 429, 502, 503, 504; backend responses (including 500) passed through.
 - `X-Request-ID` on every request, forwarded to backends, and one structured access-log line per request.
 - Demo orders / payments / restaurant services with failure injection, plus a load-test tool.
-- **115 automated tests** (108 backend + 7 demo-service), including concurrency tests.
+
+**Phase 3: resilience, shared state and monitoring** (details below)
+- Per-backend **circuit breakers** (CLOSED / OPEN / HALF_OPEN) and a **retry engine** (exponential
+  backoff + jitter, idempotency rules, retry budget).
+- **Redis**: rate limits shared by all gateway instances (atomic Lua scripts, local fallback when Redis
+  is down), a shared response cache for backend-approved GETs, cross-gateway cache invalidation
+  (pub/sub), leader election for health checks.
+- **Automatic health checks**: HEALTHY / DEGRADED / DOWN with hysteresis; latency, availability,
+  uptime, heartbeats.
+- Every request persisted in `request_logs` (async, batched); traffic statistics with p50/p95/p99.
+- **Prometheus** metrics and a provisioned **Grafana** dashboard; an 8-page React dashboard.
+- **179 automated tests** (170 backend + 9 demo-service), including concurrency tests against real Redis.
+
+## Phase 3: Distributed System Features & Monitoring
+
+![Grafana dashboard](docs/images/phase3-grafana.png)
+
+| Feature | Implementation |
+|---|---|
+| Circuit breaker | `resilience/CircuitBreaker`: ring buffer of the last 10 outcomes; opens at ≥50% failures (min 5 calls); 10 s open; 2 half-open trial calls. One per backend address. All-open → 503 + `Retry-After`. |
+| Retry engine | `resilience/Retry*`: 3 attempts, 100 → 200 → 400 ms ±20% jitter; connection failures always, timeouts/502/503/504 only for idempotent methods or `Idempotency-Key`; never 4xx/500; retries capped at ~20% of traffic by a lock-free budget. `X-Retry-Count` header. |
+| Distributed rate limiting | `ratelimit/RedisRateLimiter` + `resources/redis/*.lua`: all three algorithms as atomic Lua scripts; `FallbackRateLimiter` enforces local limits while Redis is down |
+| Response cache | `cache/`: Redis-backed, only anonymous GETs the backend marks cacheable (`Cache-Control` max-age/s-maxage, not private/no-store); `X-Cache`, `Age` |
+| Cache invalidation | `redis/RegistryChangeBroadcaster`: registry changes published on a Redis channel; every gateway clears its discovery cache (TTL remains the safety net) |
+| Health monitoring | `health/`: parallel probes every 5 s on a fixed thread pool; DOWN after 3 failures, HEALTHY after 2 successes, DEGRADED on failures or 2 slow probes; leader-elected via a Redis lease |
+| Request logs | `logging/`: bounded non-blocking queue → batched inserts; `/api/request-logs`, `/api/traffic/summary`, `/api/traffic/failures`; 7-day retention |
+| Metrics | `metrics/GatewayMetrics`: RPS, latency histogram (p95/p99), errors, 429s, retries, circuit transitions/state, cache, per-backend up/uptime/connections, Redis, request-log drops |
+| Dashboard | Overview, Services, Service health, Traffic, Rate limiting, Failures, Circuit breakers, Request logs |
+
+**Measured with real processes** ([raw output](docs/results/phase-3)):
+
+| Scenario | Result |
+|---|---|
+| Two gateways, limit 30/10 s, one client alternating | `LOCAL` state: **60** allowed · `REDIS`: **30** allowed |
+| 1000 concurrent requests across two gateways | `LOCAL`: 30 + 30 = 60 allowed · `REDIS`: 5 + 25 = **30** allowed |
+| Backend returns 500 (health endpoint still fine) | circuit **OPEN** within 8 s; recovered backend → **CLOSED** 2 s after recovery |
+| Backend process killed | health **DEGRADED** after 4 s → **DOWN** after 14 s; circuit OPEN; restarted → **HEALTHY** after 2 probes |
+| Leader election, two gateways | exactly one gateway ran health checks |
+
+Full explanations, the failure timeline, bugs found and a code review: [Phase 3 guide](docs/phase-3-guide.md).
 
 ## Phase 2: Intelligent Traffic Management
 
@@ -247,10 +287,14 @@ Then follow the [Demo](#demo) section to run backends and route traffic through 
 ## Tests
 
 ```bash
-cd backend && ./mvnw verify                    # 108 tests: unit, concurrency, web, integration (embedded PostgreSQL)
-cd services/demo-service && ./mvnw verify      # 7 tests
+cd backend && ./mvnw verify                    # 170 tests: unit, concurrency, web, integration (embedded PostgreSQL, Redis)
+cd services/demo-service && ./mvnw verify      # 9 tests
 cd frontend && npm run build                   # type-check and production build
 ```
+
+Redis for tests: a Testcontainers `redis:7-alpine` container when Docker is available, otherwise a
+local `redis-server` binary (`REDIS_SERVER_BIN=/path/to/redis-server`), otherwise the Redis tests are
+reported as skipped.
 
 The gateway integration tests start the real gateway on a random port and route to real HTTP stub
 servers that can be healthy, return 500, be slow, or refuse connections. Time-based logic is tested
@@ -269,7 +313,16 @@ with an injected `Clock`, so no test depends on `Thread.sleep`.
 | GET | `/api/service-instances/{id}` | Get one instance | 1 |
 | PATCH | `/api/service-instances/{id}/status` | Set `HEALTHY` / `DEGRADED` / `DOWN` → 200 | 2 |
 | DELETE | `/api/service-instances/{id}` | Remove an instance → 204 | 1 |
-| GET | `/api/health` | Backend + database health (200 / 503) | 1 |
+| GET | `/api/health` | Backend health: database + Redis (200 UP/DEGRADED, 503 when the database is down) | 1, 3 |
+| GET | `/api/health/instances` | Per-instance status, probe latency, availability, uptime, circuit, connections | 3 |
+| POST | `/api/health/instances/check` | Run one health-check cycle now | 3 |
+| GET | `/api/circuit-breakers` | Breaker states and recent transitions | 3 |
+| GET | `/api/request-logs?serviceId=&status=&statusClass=&clientId=&page=&size=` | Paginated request logs | 3 |
+| GET | `/api/request-logs/{requestId}` | Everything logged for one X-Request-ID | 3 |
+| GET | `/api/traffic/summary?minutes=` | Totals, error/429/retry counts, p50/p95/p99, per minute, per service | 3 |
+| GET | `/api/traffic/failures?minutes=` | Failures grouped by service, status and reason | 3 |
+| GET | `/api/gateway/settings` | Effective rate-limit, Redis, circuit-breaker, retry and cache settings | 3 |
+| GET | `/actuator/prometheus` | Prometheus metrics | 3 |
 | ANY | `/gateway/{service-path}/**` | Proxied to an instance; 400 / 404 / 429 / 502 / 503 / 504 on gateway errors | 2 |
 
 ## Known limitations
@@ -277,8 +330,9 @@ with an injected `Clock`, so no test depends on `Thread.sleep`.
 Not a production system. The most important gaps (full list: [Phase 2 review](docs/phase-2-guide.md#20-strict-code-review)):
 - **No authentication yet** (Phase 4). Anyone can register instances, and the gateway would proxy to them.
 - `X-User-Id` is not verified, so per-user limits can be evaded; the default key is the client IP.
-- Rate-limit state lives in each gateway process: several gateways would each allow the full limit (Redis in Phase 3).
-- Instance health is set manually; automatic health checks are Phase 3.
+- While Redis is down, each gateway enforces limits locally (N gateways allow up to N × limit).
+- Circuit-breaker state and active-connection counts are per gateway process.
+- Retries wait on the request thread (worst case adds `3 × timeout + backoff` to one request).
 - Request and response bodies are buffered in memory with no size limit yet.
 
 ## Documentation
@@ -287,7 +341,9 @@ Not a production system. The most important gaps (full list: [Phase 2 review](do
 - [Database design](database/README.md): ER diagram, keys, indexes, normalisation
 - [Phase 1 guide](docs/phase-1-guide.md): registry concepts, bugs found, interview questions
 - [Phase 2 guide](docs/phase-2-guide.md): gateway, rate limiting, load balancing, concurrency, measured results, code review, interview questions
-- [Phase 2 raw results](docs/results/phase-2): every measurement quoted above
+- [Phase 2 raw results](docs/results/phase-2): every Phase 2 measurement
+- [Phase 3 guide](docs/phase-3-guide.md): circuit breaker, retries, Redis, health checks, logging, metrics, measured results, code review, interview questions
+- [Monitoring](monitoring/README.md): Prometheus and Grafana setup
 
 ## Project structure
 
@@ -298,6 +354,13 @@ backend/                 Spring Boot gateway + registry (Java 21, Spring Boot 3.
   .../ratelimit/         RateLimiter interface + 3 algorithms
   .../loadbalancer/      LoadBalancingStrategy interface + 3 algorithms, connection tracker
   .../web/               request-id filter, client IP resolution
+  .../resilience/        circuit breaker, retry policy/budget/decider
+  .../redis/             Redis guard, pub/sub invalidation, leader lock
+  .../cache/             response cache and its HTTP caching rules
+  .../health/            automatic health checks
+  .../logging/           request-log writer, queries, traffic statistics
+  .../metrics/           Prometheus metrics
+  resources/redis/       Lua scripts for distributed rate limiting
   .../service, repository, entity, dto, exception, config   (Phase 1 layers)
 services/demo-service/   demo orders / payments / restaurant backends
 frontend/                React 19 + TypeScript dashboard (Vite)
@@ -305,7 +368,8 @@ scripts/                 start / stop / register the demo services
 tests/load/              LoadTest.java and the strategy-comparison script
 database/                schema documentation and ER diagram
 docs/                    architecture, phase guides, measured results, images
-monitoring/              Prometheus + Grafana config (Phase 3)
+monitoring/              Prometheus scrape config, Grafana provisioning and dashboard
+legacy/                  pre-rewrite copies of replaced files (rollback/comparison only)
 docker/                  Dockerfiles (Phase 4)
 ```
 

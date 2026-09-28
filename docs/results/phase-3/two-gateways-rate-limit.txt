@@ -1,0 +1,11 @@
+Two gateway processes (:8080 and :8081), same config: SLIDING_WINDOW 30 requests / 10 s per user.
+One client sends 60 requests, alternating between the two gateways, within ~2 s.
+store=REDIS : allowed 30 of 60
+leader: 8080 checker=false, 8081 checker=true
+1000 concurrent requests (500 per gateway, 25 threads each), one user:
+  :8080   status codes: {200=5, 429=495}
+  :8081   status codes: {200=25, 429=475}
+store=LOCAL : allowed 60 of 60
+1000 concurrent with LOCAL:
+  :8080   status codes: {200=30, 429=470}
+  :8081   status codes: {200=30, 429=470}
