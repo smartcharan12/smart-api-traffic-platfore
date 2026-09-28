@@ -2,6 +2,7 @@ import type {
   CreateInstanceRequest,
   CreateServiceRequest,
   Health,
+  InstanceStatus,
   Service,
   ServiceInstance,
 } from './types';
@@ -50,6 +51,11 @@ export const api = {
   listInstances: () => request<ServiceInstance[]>('/api/service-instances'),
   createInstance: (body: CreateInstanceRequest) =>
     request<ServiceInstance>('/api/service-instances', { method: 'POST', body: JSON.stringify(body) }),
+  updateInstanceStatus: (id: number, status: InstanceStatus) =>
+    request<ServiceInstance>(`/api/service-instances/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
   deleteInstance: (id: number) => request<void>(`/api/service-instances/${id}`, { method: 'DELETE' }),
 
   // /api/health answers 503 with a JSON body when a dependency is down, so read the body either way.

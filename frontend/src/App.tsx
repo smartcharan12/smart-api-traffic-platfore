@@ -73,6 +73,11 @@ export default function App() {
           onDelete={(i) => {
             if (confirm(`Remove ${i.host}:${i.port}?`)) void runAndRefresh(() => api.deleteInstance(i.id));
           }}
+          onStatusChange={(i, status) =>
+            void runAndRefresh(async () => {
+              await api.updateInstanceStatus(i.id, status);
+            })
+          }
         />
       </section>
 
