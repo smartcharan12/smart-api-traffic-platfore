@@ -25,6 +25,7 @@ import org.springframework.test.context.DynamicPropertySource;
 
 /** Gateway + real PostgreSQL + real Redis: shared rate limits, shared response cache, pub/sub invalidation. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "gateway.health-check.enabled=false",
         "gateway.rate-limit.enabled=true",
         "gateway.rate-limit.store=REDIS",
         "gateway.rate-limit.algorithm=SLIDING_WINDOW",

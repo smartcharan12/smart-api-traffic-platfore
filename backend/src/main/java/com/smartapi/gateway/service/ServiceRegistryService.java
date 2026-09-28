@@ -45,7 +45,8 @@ public class ServiceRegistryService {
                 ? request.loadBalancingStrategy()
                 : LoadBalancingStrategyType.ROUND_ROBIN;
         ApiService saved = serviceRepository.save(
-                new ApiService(request.name(), request.basePath(), request.description(), strategy));
+                new ApiService(request.name(), request.basePath(), request.description(), strategy,
+                        request.healthCheckPath()));
         events.publishEvent(new RegistryChangedEvent("service registered: " + saved.getName()));
         return ServiceResponse.from(saved);
     }

@@ -21,6 +21,11 @@ public interface ServiceInstanceRepository extends JpaRepository<ServiceInstance
     @Query("select i from ServiceInstance i join fetch i.service where i.service.id = :serviceId order by i.id")
     List<ServiceInstance> findAllByServiceIdWithService(Long serviceId);
 
+    /** One UPDATE for all instances that answered a health probe in this cycle. */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("update ServiceInstance i set i.lastHeartbeatAt = :at where i.id in :ids")
+    int updateHeartbeats(java.util.Collection<Long> ids, java.time.Instant at);
+
     @Query("select i from ServiceInstance i join fetch i.service where i.id = :id")
     Optional<ServiceInstance> findByIdWithService(Long id);
 }

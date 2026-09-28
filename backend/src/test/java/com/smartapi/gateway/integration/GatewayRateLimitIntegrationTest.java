@@ -15,6 +15,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /** The Demo 3 configuration: 5 requests per 10 seconds, one bucket per user. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "gateway.health-check.enabled=false",
         "gateway.rate-limit.enabled=true",
         "gateway.cache.enabled=false",
         "gateway.rate-limit.store=LOCAL",

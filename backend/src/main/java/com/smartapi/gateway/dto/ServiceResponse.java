@@ -11,6 +11,7 @@ public record ServiceResponse(
         String basePath,
         String description,
         LoadBalancingStrategyType loadBalancingStrategy,
+        String healthCheckPath,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -21,6 +22,7 @@ public record ServiceResponse(
                 service.getBasePath(),
                 service.getDescription(),
                 service.getLoadBalancingStrategy(),
+                service.getHealthCheckPath(),
                 service.getCreatedAt(),
                 service.getUpdatedAt());
     }

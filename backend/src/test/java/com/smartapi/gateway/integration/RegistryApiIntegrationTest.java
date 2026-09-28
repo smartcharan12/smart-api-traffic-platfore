@@ -20,7 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** Full stack: HTTP -> controller -> service -> JPA -> real PostgreSQL (schema from Flyway). */
-@SpringBootTest(properties = "spring.data.redis.url=redis://127.0.0.1:1")
+@SpringBootTest(properties = {"spring.data.redis.url=redis://127.0.0.1:1", "gateway.health-check.enabled=false"})
 @AutoConfigureMockMvc
 class RegistryApiIntegrationTest extends PostgresIntegrationTest {
 

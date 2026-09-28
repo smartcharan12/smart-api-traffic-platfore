@@ -38,7 +38,7 @@ class ServiceControllerTest {
     @Test
     void createReturns201WithLocationHeader() throws Exception {
         when(registryService.register(any(CreateServiceRequest.class))).thenReturn(new ServiceResponse(
-                5L, "orders-service", "/orders", null, LoadBalancingStrategyType.ROUND_ROBIN,
+                5L, "orders-service", "/orders", null, LoadBalancingStrategyType.ROUND_ROBIN, "/health",
                 Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z")));
 
         mockMvc.perform(post("/api/services")

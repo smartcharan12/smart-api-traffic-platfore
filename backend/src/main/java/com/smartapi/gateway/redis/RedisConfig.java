@@ -22,6 +22,13 @@ public class RedisConfig {
                 : new NoOpResponseCache();
     }
 
+    /** Lease lasts 3 check intervals: a crashed leader is replaced within ~15 s by default. */
+    @Bean
+    public LeaderLock healthCheckLeaderLock(StringRedisTemplate redis, RedisGuard guard, GatewayProperties properties) {
+        return new LeaderLock(redis, guard, "gateway:leader:health-checker",
+                properties.healthCheck().interval().multipliedBy(3));
+    }
+
     @Bean
     public ResponseCachePolicy responseCachePolicy(GatewayProperties properties) {
         return new ResponseCachePolicy(properties.cache().maxTtl(), properties.cache().maxBodyBytes());

@@ -79,6 +79,14 @@ public class ServiceInstanceService {
         return ServiceInstanceResponse.from(instance);
     }
 
+    /** Heartbeats don't change routing, so no RegistryChangedEvent is published. */
+    @Transactional
+    public void recordHeartbeats(java.util.Collection<Long> instanceIds, java.time.Instant at) {
+        if (!instanceIds.isEmpty()) {
+            instanceRepository.updateHeartbeats(instanceIds, at);
+        }
+    }
+
     @Transactional
     public void delete(Long id) {
         if (!instanceRepository.existsById(id)) {

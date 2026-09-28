@@ -52,6 +52,11 @@ public class CircuitBreakerRegistry {
                 address -> new CircuitBreaker(address, config, clock, this::onTransition));
     }
 
+    /** Existing breaker for an address, without creating one. */
+    public java.util.Optional<CircuitBreaker> find(String address) {
+        return java.util.Optional.ofNullable(breakers.get(address));
+    }
+
     /** e.g. the metrics component registers here to count openings. */
     public void addListener(Consumer<CircuitBreaker.Transition> listener) {
         listeners.add(listener);

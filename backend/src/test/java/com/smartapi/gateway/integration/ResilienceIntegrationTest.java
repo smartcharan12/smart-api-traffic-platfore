@@ -27,6 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * (Breaker config: window 10, minimum 5 calls, 50% threshold, open 10 s, 2 trial calls.)
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "gateway.health-check.enabled=false",
         "gateway.rate-limit.enabled=false",
         "gateway.cache.enabled=false",
         "gateway.rate-limit.store=LOCAL",

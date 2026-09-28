@@ -23,7 +23,27 @@ public record GatewayProperties(@Valid @DefaultValue Proxy proxy, @Valid @Defaul
                                 @Valid @DefaultValue Discovery discovery,
                                 @Valid @DefaultValue CircuitBreaker circuitBreaker,
                                 @Valid @DefaultValue Retry retry,
-                                @Valid @DefaultValue Cache cache) {
+                                @Valid @DefaultValue Cache cache,
+                                @Valid @DefaultValue HealthCheck healthCheck) {
+
+    /**
+     * Active health checks: GET {service.healthCheckPath} on every instance, every {@code interval}.
+     *
+     * @param degradedLatency     a successful probe slower than this marks the instance DEGRADED
+     * @param unhealthyThreshold  consecutive failed probes before DOWN
+     * @param healthyThreshold    consecutive successful probes before a DOWN instance is HEALTHY again
+     * @param threads             probes run in parallel on this many threads
+     */
+    public record HealthCheck(
+            @DefaultValue("true") boolean enabled,
+            @DefaultValue("5s") Duration interval,
+            @DefaultValue("2s") Duration initialDelay,
+            @DefaultValue("2s") Duration timeout,
+            @DefaultValue("500ms") Duration degradedLatency,
+            @DefaultValue("3") @Min(1) int unhealthyThreshold,
+            @DefaultValue("2") @Min(1) int healthyThreshold,
+            @DefaultValue("8") @Min(1) @Max(64) int threads) {
+    }
 
     /**
      * Shared response cache (Redis) for GET responses the backend marks cacheable via Cache-Control.

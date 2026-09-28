@@ -31,15 +31,20 @@ public final class TestProperties {
         return new GatewayProperties.Retry(3, Duration.ofMillis(100), 2.0, Duration.ofSeconds(1), 0.2, 0.2, 20);
     }
 
+    public static GatewayProperties.HealthCheck healthCheck() {
+        return new GatewayProperties.HealthCheck(false, Duration.ofSeconds(5), Duration.ofSeconds(2),
+                Duration.ofSeconds(2), Duration.ofMillis(500), 3, 2, 8);
+    }
+
     public static GatewayProperties withKeyBy(RateLimitDimension... dimensions) {
         return new GatewayProperties(proxy(), rateLimit(List.of(dimensions)),
                 new GatewayProperties.Discovery(Duration.ofSeconds(5)), circuitBreaker(), retry(),
-                new GatewayProperties.Cache(true, Duration.ofMinutes(5), 262_144));
+                new GatewayProperties.Cache(true, Duration.ofMinutes(5), 262_144), healthCheck());
     }
 
     public static GatewayProperties withDiscoveryTtl(Duration ttl) {
         return new GatewayProperties(proxy(), rateLimit(List.of(RateLimitDimension.IP)),
                 new GatewayProperties.Discovery(ttl), circuitBreaker(), retry(),
-                new GatewayProperties.Cache(true, Duration.ofMinutes(5), 262_144));
+                new GatewayProperties.Cache(true, Duration.ofMinutes(5), 262_144), healthCheck());
     }
 }

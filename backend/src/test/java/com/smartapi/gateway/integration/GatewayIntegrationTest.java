@@ -25,6 +25,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * stub backends. Rate limiting is off here (tested separately) so it cannot interfere.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "gateway.health-check.enabled=false",
         "gateway.rate-limit.enabled=false",
         "gateway.cache.enabled=false",
         "gateway.rate-limit.store=LOCAL",

@@ -41,6 +41,9 @@ public class ApiService {
     @Column(name = "load_balancing_strategy", nullable = false, length = 30)
     private LoadBalancingStrategyType loadBalancingStrategy;
 
+    @Column(name = "health_check_path", nullable = false, length = 200)
+    private String healthCheckPath = "/health";
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -59,6 +62,18 @@ public class ApiService {
         this.basePath = basePath;
         this.description = description;
         this.loadBalancingStrategy = loadBalancingStrategy;
+    }
+
+    public ApiService(String name, String basePath, String description,
+                      LoadBalancingStrategyType loadBalancingStrategy, String healthCheckPath) {
+        this(name, basePath, description, loadBalancingStrategy);
+        if (healthCheckPath != null) {
+            this.healthCheckPath = healthCheckPath;
+        }
+    }
+
+    public String getHealthCheckPath() {
+        return healthCheckPath;
     }
 
     public Long getId() {

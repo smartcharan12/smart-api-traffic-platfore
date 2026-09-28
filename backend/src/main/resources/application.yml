@@ -67,6 +67,15 @@ gateway:
     budget-max-tokens: 20
   discovery:
     cache-ttl: 5s              # reuse route lookups; registry changes via this gateway apply immediately
+  health-check:                # active probes of GET <service health path> on every instance
+    enabled: true
+    interval: 5s
+    initial-delay: 2s
+    timeout: 2s
+    degraded-latency: 500ms    # slower successful probe -> DEGRADED
+    unhealthy-threshold: 3     # consecutive failures -> DOWN
+    healthy-threshold: 2       # consecutive successes before DOWN -> HEALTHY
+    threads: 8
   cache:                       # shared Redis response cache; only what the backend marks cacheable
     enabled: true
     max-ttl: 5m
