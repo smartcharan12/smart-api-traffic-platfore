@@ -35,15 +35,20 @@ import org.springframework.stereotype.Component;
  *                                                       histogram_quantile(0.95|0.99) = p95 / p99
  * gateway_rate_limit_rejections_total                   429s
  * gateway_retries_total{service,reason}                 retries performed
- * gateway_circuit_breaker_transitions_total{instance,to}  e.g. to="OPEN" counts circuit openings
- * gateway_circuit_breaker_state{instance}               0 closed, 1 half-open, 2 open
+ * gateway_circuit_breaker_transitions_total{upstream,to}  e.g. to="OPEN" counts circuit openings
+ * gateway_circuit_breaker_state{upstream}               0 closed, 1 half-open, 2 open
  * gateway_cache_requests_total{result}                  HIT / MISS
- * gateway_instance_up{service,instance}                 1 healthy, 0.5 degraded, 0 down (UNKNOWN: -1)
- * gateway_instance_uptime_seconds{service,instance}     time since the instance last came up
- * gateway_instance_active_connections{service,instance} in-flight requests from this gateway
+ * gateway_instance_up{service,upstream}                 1 healthy, 0.5 degraded, 0 down (UNKNOWN: -1)
+ * gateway_instance_uptime_seconds{service,upstream}     time since the instance last came up
+ * gateway_instance_active_connections{service,upstream} in-flight requests from this gateway
  * gateway_instance_probe_latency_seconds{...}           last health-probe latency
  * gateway_request_log_dropped_total, gateway_redis_*, gateway_retry_budget_tokens
  * </pre>
+ *
+ * <p>The backend address label is called {@code upstream}, not {@code instance}: Prometheus reserves
+ * {@code instance} for the scrape target (the gateway itself) and would rename ours to
+ * {@code exported_instance}. (Found when the first Grafana screenshot labelled every backend
+ * "localhost:8080".)
  *
  * <p>Label cardinality is bounded on purpose: {@code service} is a registered service name or
  * "unresolved", never the raw path, so random URLs can't create unlimited time series.
@@ -78,7 +83,7 @@ public class GatewayMetrics {
         this.cacheMisses = Counter.builder("gateway.cache.requests").tag("result", "MISS").register(registry);
 
         breakers.addListener(t -> Counter.builder("gateway.circuit_breaker.transitions")
-                .tags("instance", t.name(), "to", t.to().name()).register(registry).increment());
+                .tags("upstream", t.name(), "to", t.to().name()).register(registry).increment());
 
         FunctionCounter.builder("gateway.request_log.dropped", requestLogWriter, RequestLogWriter::dropped)
                 .description("Request log rows dropped (queue full or database error)").register(registry);
@@ -145,14 +150,14 @@ public class GatewayMetrics {
             probeLatency.register(instances.stream().filter(i -> i.latencyMs() != null)
                     .map(i -> MultiGauge.Row.of(tags(i), i.latencyMs() / 1000.0)).toList(), true);
             circuitState.register(breakers.snapshots().stream()
-                    .map(s -> MultiGauge.Row.of(Tags.of("instance", s.name()), s.state().level())).toList(), true);
+                    .map(s -> MultiGauge.Row.of(Tags.of("upstream", s.name()), s.state().level())).toList(), true);
         } catch (RuntimeException e) {
             log.debug("Could not refresh instance gauges: {}", e.getMessage());
         }
     }
 
     private static Tags tags(InstanceHealthView i) {
-        return Tags.of("service", i.serviceName(), "instance", i.address());
+        return Tags.of("service", i.serviceName(), "upstream", i.address());
     }
 
     private static double upValue(InstanceStatus status) {

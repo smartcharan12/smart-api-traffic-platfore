@@ -38,6 +38,12 @@ class OrdersServiceTest {
     }
 
     @Test
+    void ordersAreNotMarkedCacheable() throws Exception {
+        mockMvc.perform(get("/orders")).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                .header().doesNotExist("Cache-Control"));
+    }
+
+    @Test
     void unknownOrderReturns404() throws Exception {
         mockMvc.perform(get("/orders/99")).andExpect(status().isNotFound());
     }

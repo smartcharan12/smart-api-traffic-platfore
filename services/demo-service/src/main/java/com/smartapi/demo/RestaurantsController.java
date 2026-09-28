@@ -1,8 +1,10 @@
 package com.smartapi.demo;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,9 +26,16 @@ public class RestaurantsController {
         this.instance = instance;
     }
 
+    /**
+     * Restaurant data changes rarely, so responses say they may be cached by shared caches for 30 s.
+     * The gateway's response cache honours this; orders (which change) send no such header.
+     */
+    private static final CacheControl CACHEABLE = CacheControl.maxAge(Duration.ofSeconds(30)).cachePublic();
+
     @GetMapping("/restaurants")
-    public DemoResponse list(@RequestHeader(value = "X-Request-ID", required = false) String requestId) {
-        return instance.respond("Request handled successfully", RESTAURANTS, requestId);
+    public ResponseEntity<DemoResponse> list(@RequestHeader(value = "X-Request-ID", required = false) String requestId) {
+        return ResponseEntity.ok().cacheControl(CACHEABLE)
+                .body(instance.respond("Request handled successfully", RESTAURANTS, requestId));
     }
 
     @GetMapping("/restaurants/{id}")
@@ -35,7 +44,8 @@ public class RestaurantsController {
         return RESTAURANTS.stream()
                 .filter(restaurant -> restaurant.get("id").equals(id))
                 .findFirst()
-                .map(r -> ResponseEntity.ok(instance.respond("Request handled successfully", r, requestId)))
+                .map(r -> ResponseEntity.ok().cacheControl(CACHEABLE)
+                        .body(instance.respond("Request handled successfully", r, requestId)))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(instance.respond("Restaurant " + id + " not found", null, requestId)));
     }

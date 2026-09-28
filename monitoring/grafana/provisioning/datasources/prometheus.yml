@@ -1,0 +1,12 @@
+# Provisioned on Grafana startup: no manual clicking. PROMETHEUS_URL is set by docker-compose
+# (http://prometheus:9090) or exported before a local run (http://localhost:9090).
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: ${PROMETHEUS_URL}
+    isDefault: true
+    jsonData:
+      timeInterval: 5s

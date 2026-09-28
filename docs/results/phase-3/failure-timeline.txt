@@ -1,0 +1,61 @@
+t=  0s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t=  2s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t=  4s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t=  6s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t=  8s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 10s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 12s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 14s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 16s  circuit(9002)=CLOSED    health(9002)=HEALTHY   <- 9002 starts returning HTTP 500
+t= 18s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 20s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 22s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 24s  circuit(9002)=OPEN      health(9002)=HEALTHY   
+t= 26s  circuit(9002)=OPEN      health(9002)=HEALTHY   
+t= 28s  circuit(9002)=OPEN      health(9002)=HEALTHY   
+t= 30s  circuit(9002)=OPEN      health(9002)=HEALTHY   
+t= 32s  circuit(9002)=OPEN      health(9002)=HEALTHY   
+t= 34s  circuit(9002)=OPEN      health(9002)=HEALTHY   
+t= 36s  circuit(9002)=OPEN      health(9002)=HEALTHY   
+t= 38s  circuit(9002)=OPEN      health(9002)=HEALTHY   
+t= 40s  circuit(9002)=OPEN      health(9002)=HEALTHY   
+t= 42s  circuit(9002)=OPEN      health(9002)=HEALTHY   
+t= 44s  circuit(9002)=OPEN      health(9002)=HEALTHY   <- 9002 recovers
+t= 46s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 48s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 50s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 52s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 54s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 56s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 58s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 60s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 62s  circuit(9002)=CLOSED    health(9002)=HEALTHY   <- 9002 process killed
+t= 64s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t= 66s  circuit(9002)=CLOSED    health(9002)=DEGRADED  
+t= 68s  circuit(9002)=CLOSED    health(9002)=DEGRADED  
+t= 70s  circuit(9002)=OPEN      health(9002)=DEGRADED  
+t= 72s  circuit(9002)=OPEN      health(9002)=DEGRADED  
+t= 74s  circuit(9002)=OPEN      health(9002)=DEGRADED  
+t= 76s  circuit(9002)=OPEN      health(9002)=DOWN      
+t= 78s  circuit(9002)=OPEN      health(9002)=DOWN      
+t= 80s  circuit(9002)=OPEN      health(9002)=DOWN      
+t= 82s  circuit(9002)=OPEN      health(9002)=DOWN      
+t= 84s  circuit(9002)=OPEN      health(9002)=DOWN      
+t= 86s  circuit(9002)=OPEN      health(9002)=DOWN      
+t= 88s  circuit(9002)=OPEN      health(9002)=DOWN      
+t= 90s  circuit(9002)=OPEN      health(9002)=DOWN      
+t= 92s  circuit(9002)=OPEN      health(9002)=DOWN      
+t= 94s  circuit(9002)=OPEN      health(9002)=DOWN      
+t= 96s  circuit(9002)=OPEN      health(9002)=DOWN      <- 9002 restarted
+t= 98s  circuit(9002)=OPEN      health(9002)=DOWN      
+t=100s  circuit(9002)=OPEN      health(9002)=DOWN      
+t=102s  circuit(9002)=OPEN      health(9002)=HEALTHY   
+t=104s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t=106s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t=108s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t=110s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t=112s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t=114s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t=116s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t=118s  circuit(9002)=CLOSED    health(9002)=HEALTHY   
+t=120s  circuit(9002)=CLOSED    health(9002)=HEALTHY   

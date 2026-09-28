@@ -88,11 +88,13 @@ class MetricsIntegrationTest extends GatewayTestSupport {
                 .contains("gateway_requests_seconds_count{application=\"smart-api-gateway\",method=\"GET\",service=\"unresolved\",status=\"429\"} 1")
                 .contains("gateway_rate_limit_rejections_total{application=\"smart-api-gateway\"} 1.0")
                 .contains("gateway_retries_total{application=\"smart-api-gateway\",reason=\"RETRYABLE_STATUS\",service=\"orders-service\"}")
-                .contains("gateway_circuit_breaker_transitions_total{application=\"smart-api-gateway\",instance=\"127.0.0.1:" + bad.port() + "\",to=\"OPEN\"} 1.0")
-                .contains("gateway_circuit_breaker_state{application=\"smart-api-gateway\",instance=\"127.0.0.1:" + bad.port() + "\"} 2.0")
-                .contains("gateway_instance_active_connections{application=\"smart-api-gateway\",instance=\"127.0.0.1:" + ok.port() + "\",service=\"orders-service\"} 0.0")
+                .contains("gateway_circuit_breaker_transitions_total{application=\"smart-api-gateway\",to=\"OPEN\",upstream=\"127.0.0.1:" + bad.port() + "\"} 1.0")
+                .contains("gateway_circuit_breaker_state{application=\"smart-api-gateway\",upstream=\"127.0.0.1:" + bad.port() + "\"} 2.0")
+                .contains("gateway_instance_active_connections{application=\"smart-api-gateway\",service=\"orders-service\",upstream=\"127.0.0.1:" + ok.port() + "\"} 0.0")
                 .contains("gateway_request_log_dropped_total")
                 .contains("gateway_redis_available");
+        // "instance" is Prometheus' own target label; ours must not collide with it.
+        assertThat(scrape).doesNotContain("instance=\"127.0.0.1");
         // The raw path never becomes a label value.
         assertThat(scrape).doesNotContain("service=\"/nothing\"");
     }
