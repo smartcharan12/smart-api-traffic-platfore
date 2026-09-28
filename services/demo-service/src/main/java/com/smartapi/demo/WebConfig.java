@@ -15,7 +15,7 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // Chaos applies to business endpoints only, so /_chaos itself and /health keep working.
-        registry.addInterceptor(chaosInterceptor).excludePathPatterns("/_chaos", "/health", "/error");
+        // /_chaos must always work (to switch chaos off). /health is affected only with includeHealth=true.
+        registry.addInterceptor(chaosInterceptor).excludePathPatterns("/_chaos", "/error");
     }
 }

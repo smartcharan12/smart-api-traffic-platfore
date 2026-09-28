@@ -54,6 +54,17 @@ class OrdersServiceTest {
     }
 
     @Test
+    void unavailableWithIncludeHealthAlsoFailsHealthProbes() throws Exception {
+        mockMvc.perform(post("/_chaos").param("mode", "UNAVAILABLE")).andExpect(status().isOk());
+        mockMvc.perform(get("/orders")).andExpect(status().isServiceUnavailable());
+        mockMvc.perform(get("/health")).andExpect(status().isOk());          // default: health unaffected
+
+        mockMvc.perform(post("/_chaos").param("mode", "UNAVAILABLE").param("includeHealth", "true"))
+                .andExpect(jsonPath("$.includeHealth").value(true));
+        mockMvc.perform(get("/health")).andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
     void chaosCannotBeTriggeredThroughTheGateway() throws Exception {
         mockMvc.perform(post("/_chaos").param("mode", "ERROR").header("X-Forwarded-For", "203.0.113.9"))
                 .andExpect(status().isForbidden());

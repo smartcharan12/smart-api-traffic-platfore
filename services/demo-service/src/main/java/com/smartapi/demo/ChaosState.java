@@ -11,19 +11,30 @@ import org.springframework.stereotype.Component;
 @Component
 public class ChaosState {
 
+    /** ERROR = HTTP 500, UNAVAILABLE = HTTP 503, SLOW = wait delayMs, then answer normally. */
     public enum Mode {
         NONE,
         ERROR,
+        UNAVAILABLE,
         SLOW
     }
 
-    public record Settings(Mode mode, long delayMs) {
+    /**
+     * @param includeHealth also apply the mode to /health. Off: the instance is "alive but broken"
+     *                      (only the gateway's circuit breaker notices). On: health probes fail or are
+     *                      slow too, so the health checker moves it to DEGRADED / DOWN.
+     */
+    public record Settings(Mode mode, long delayMs, boolean includeHealth) {
     }
 
-    private volatile Settings settings = new Settings(Mode.NONE, 0);
+    private volatile Settings settings = new Settings(Mode.NONE, 0, false);
 
     public void set(Mode mode, long delayMs) {
-        settings = new Settings(mode, Math.max(0, delayMs));
+        set(mode, delayMs, false);
+    }
+
+    public void set(Mode mode, long delayMs, boolean includeHealth) {
+        settings = new Settings(mode, Math.max(0, Math.min(delayMs, 60_000)), includeHealth);
     }
 
     public Mode mode() {

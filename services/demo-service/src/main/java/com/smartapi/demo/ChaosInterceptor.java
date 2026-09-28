@@ -23,10 +23,13 @@ public class ChaosInterceptor implements HandlerInterceptor {
     public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
                              @NonNull Object handler) throws Exception {
         var settings = chaos.snapshot();
+        if ("/health".equals(request.getRequestURI()) && !settings.includeHealth()) {
+            return true;
+        }
         switch (settings.mode()) {
             case SLOW -> Thread.sleep(settings.delayMs());
-            case ERROR -> {
-                response.setStatus(500);
+            case ERROR, UNAVAILABLE -> {
+                response.setStatus(settings.mode() == ChaosState.Mode.ERROR ? 500 : 503);
                 response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                 response.getWriter().write("{\"service\":\"%s\",\"instance\":\"%s\",\"message\":\"Simulated failure\"}"
                         .formatted(instance.serviceName(), instance.instanceId()));
