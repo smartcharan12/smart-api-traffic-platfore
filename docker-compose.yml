@@ -1,6 +1,16 @@
-# Phase 1: only PostgreSQL. Backend, frontend, Redis, Prometheus and Grafana are added in later phases.
-# Usage:  cp .env.example .env   (edit DB_PASSWORD)   then   docker compose up -d postgres
+# The whole platform: gateway, dashboard, 5 demo backends, PostgreSQL, Redis, Prometheus, Grafana.
+#
+#   cp .env.example .env        # then set the passwords / JWT secret
+#   docker compose up -d --build
+#   dashboard http://localhost:5173 · gateway http://localhost:8080 · Grafana http://localhost:3000
+#
+# All containers share one Docker network; they reach each other by service name (postgres,
+# redis, gateway, orders-1, ...). Only the ports below marked "published" are reachable from the host.
 name: smart-api-platform
+
+x-demo-service: &demo-service
+  build: ./services/demo-service
+  restart: unless-stopped
 
 services:
   postgres:
@@ -9,15 +19,116 @@ services:
       POSTGRES_DB: smart_api
       POSTGRES_USER: ${DB_USERNAME:-smart_api}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 20
+    restart: unless-stopped
+    # not published: only the gateway talks to the database
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]  # cache/limits only: no persistence needed
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  gateway:
+    build: ./backend
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/smart_api
+      DB_USERNAME: ${DB_USERNAME:-smart_api}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      REDIS_URL: redis://redis:6379
+      RATE_LIMIT_STORE: REDIS
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (at least 32 characters)}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env (at least 12 characters)}
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
+      # X-Forwarded-For is NOT trusted: port 8080 is published, so any client could forge it and
+      # escape per-IP rate limits. Gateway clients connect directly, so the socket address is right.
+    ports:
+      - "8080:8080"   # published: clients call /gateway/** here
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  orders-1:
+    <<: *demo-service
+    environment: { DEMO_SERVICE_NAME: orders-service, SERVER_PORT: "9001" }
+  orders-2:
+    <<: *demo-service
+    environment: { DEMO_SERVICE_NAME: orders-service, SERVER_PORT: "9002" }
+  orders-3:
+    <<: *demo-service
+    environment: { DEMO_SERVICE_NAME: orders-service, SERVER_PORT: "9003" }
+  payments:
+    <<: *demo-service
+    environment: { DEMO_SERVICE_NAME: payments-service, SERVER_PORT: "9101" }
+  restaurants:
+    <<: *demo-service
+    environment: { DEMO_SERVICE_NAME: restaurant-service, SERVER_PORT: "9201" }
+
+  # One-shot: registers the demo services with the gateway (as ADMIN), then exits.
+  demo-setup:
+    image: alpine:3.20
+    command: ["sh", "-c", "apk add --no-cache bash curl > /dev/null && bash /scripts/register-demo-services.sh http://gateway:8080"]
+    environment:
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ORDERS_INSTANCES: "orders-1:9001:3 orders-2:9002:2 orders-3:9003:1"
+      PAYMENTS_INSTANCES: "payments:9101:1"
+      RESTAURANT_INSTANCES: "restaurants:9201:1"
+    volumes:
+      - ./scripts:/scripts:ro
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: "no"
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"     # published: the dashboard (nginx also proxies /api and /gateway to the gateway)
+    depends_on:
+      - gateway
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"   # published for the demo; restrict in production
+    depends_on:
+      - gateway
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.2.2
+    environment:
+      PROMETHEUS_URL: http://prometheus:9090
+      GRAFANA_DASHBOARDS_DIR: /var/lib/grafana/dashboards
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"      # read-only viewers for the demo dashboard
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
 
 volumes:
   postgres-data:
