@@ -9,6 +9,7 @@ import com.smartapi.gateway.exception.ResourceNotFoundException;
 import com.smartapi.gateway.repository.ApiServiceRepository;
 import java.util.List;
 import org.springframework.data.domain.Sort;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,11 +18,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class ServiceRegistryService {
 
     private final ApiServiceRepository serviceRepository;
+    private final ApplicationEventPublisher events;
 
-    // Constructor injection: Spring sees the single constructor and passes in the repository bean.
-    // The field can be final, and a unit test can call `new ServiceRegistryService(mockRepo)`.
-    public ServiceRegistryService(ApiServiceRepository serviceRepository) {
+    // Constructor injection: Spring sees the single constructor and passes in the beans.
+    // The fields can be final, and a unit test can call the constructor with mocks.
+    public ServiceRegistryService(ApiServiceRepository serviceRepository, ApplicationEventPublisher events) {
         this.serviceRepository = serviceRepository;
+        this.events = events;
     }
 
     /**
@@ -43,6 +46,7 @@ public class ServiceRegistryService {
                 : LoadBalancingStrategyType.ROUND_ROBIN;
         ApiService saved = serviceRepository.save(
                 new ApiService(request.name(), request.basePath(), request.description(), strategy));
+        events.publishEvent(new RegistryChangedEvent("service registered: " + saved.getName()));
         return ServiceResponse.from(saved);
     }
 
@@ -67,5 +71,6 @@ public class ServiceRegistryService {
             throw new ResourceNotFoundException("Service", id);
         }
         serviceRepository.deleteById(id);
+        events.publishEvent(new RegistryChangedEvent("service deleted: " + id));
     }
 }

@@ -21,6 +21,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 /** Pure unit test: no Spring context, no database. The repository is a Mockito mock. */
 @ExtendWith(MockitoExtension.class)
@@ -28,6 +29,9 @@ class ServiceRegistryServiceTest {
 
     @Mock
     private ApiServiceRepository repository;
+
+    @Mock
+    private ApplicationEventPublisher events;
 
     @InjectMocks
     private ServiceRegistryService registryService;

@@ -32,6 +32,27 @@ server:
   error:
     include-stacktrace: never
 
+# Every log line carries the request id (set by RequestIdFilter), e.g.  INFO [7c3e...] gateway.access : ...
+logging:
+  pattern:
+    level: "%5p [%X{requestId:-}]"
+
+# Phase 2: the gateway. Bound to GatewayProperties (validated at startup).
+gateway:
+  proxy:
+    connect-timeout: 1s        # opening a TCP connection to an instance
+    response-timeout: 5s       # waiting for the instance to answer -> 504 when exceeded
+    max-connect-attempts: 3    # instances to try when connections are refused -> 503 when all fail
+  discovery:
+    cache-ttl: 5s              # reuse route lookups; registry changes via this gateway apply immediately
+  rate-limit:
+    enabled: true
+    algorithm: TOKEN_BUCKET    # FIXED_WINDOW | SLIDING_WINDOW | TOKEN_BUCKET
+    limit: 100                 # requests per window (token bucket: capacity 100, refill 100/60s)
+    window: 1m
+    key-by: IP                 # any of IP, USER, ENDPOINT, e.g. "USER,ENDPOINT"
+    trust-forwarded-for: false # only true behind a proxy you control (see ClientIpResolver)
+
 management:
   endpoints:
     web:

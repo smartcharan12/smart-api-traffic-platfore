@@ -23,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,6 +34,9 @@ class ServiceInstanceServiceTest {
 
     @Mock
     private ApiServiceRepository serviceRepository;
+
+    @Mock
+    private ApplicationEventPublisher events;
 
     @InjectMocks
     private ServiceInstanceService instanceService;

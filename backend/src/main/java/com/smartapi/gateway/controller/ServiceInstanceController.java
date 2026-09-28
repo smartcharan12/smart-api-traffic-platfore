@@ -2,6 +2,7 @@ package com.smartapi.gateway.controller;
 
 import com.smartapi.gateway.dto.CreateServiceInstanceRequest;
 import com.smartapi.gateway.dto.ServiceInstanceResponse;
+import com.smartapi.gateway.dto.UpdateInstanceStatusRequest;
 import com.smartapi.gateway.service.ServiceInstanceService;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -10,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -48,6 +50,16 @@ public class ServiceInstanceController {
     @GetMapping("/{id}")
     public ServiceInstanceResponse get(@PathVariable Long id) {
         return instanceService.findById(id);
+    }
+
+    /**
+     * Mark an instance HEALTHY / DEGRADED / DOWN by hand. The gateway stops routing to DOWN instances
+     * immediately. PATCH because we change one field of the resource, not replace all of it.
+     */
+    @PatchMapping("/{id}/status")
+    public ServiceInstanceResponse updateStatus(@PathVariable Long id,
+                                                @Valid @RequestBody UpdateInstanceStatusRequest request) {
+        return instanceService.updateStatus(id, request.status());
     }
 
     @DeleteMapping("/{id}")

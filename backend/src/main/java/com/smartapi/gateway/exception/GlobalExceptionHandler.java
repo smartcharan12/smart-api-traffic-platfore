@@ -3,6 +3,7 @@ package com.smartapi.gateway.exception;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.Logger;
+import com.smartapi.gateway.web.RequestIdFilter;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -31,6 +32,17 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    /**
+     * All gateway failures (400/404/429/502/503/504). The status, title and extra headers come from the
+     * exception subclass itself, so this one method covers every case.
+     */
+    @ExceptionHandler(GatewayException.class)
+    public ResponseEntity<ProblemDetail> handleGateway(GatewayException ex) {
+        return ResponseEntity.status(ex.getStatus())
+                .headers(ex.responseHeaders())
+                .body(problem(ex.getStatus(), ex.getTitle(), ex.getMessage()));
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ProblemDetail handleNotFound(ResourceNotFoundException ex) {
@@ -89,6 +101,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
         problem.setTitle(title);
+        // Lets a client quote the id from the error body when reporting a problem; we grep logs for it.
+        String requestId = RequestIdFilter.currentRequestId();
+        if (requestId != null) {
+            problem.setProperty("requestId", requestId);
+        }
         return problem;
     }
 }

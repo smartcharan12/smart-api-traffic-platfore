@@ -64,6 +64,11 @@ public class ServiceInstance {
         this.status = InstanceStatus.UNKNOWN;
     }
 
+    /** Manual status override (PATCH endpoint). Phase 3's health checker will call this automatically. */
+    public void changeStatus(InstanceStatus status) {
+        this.status = status;
+    }
+
     public Long getId() {
         return id;
     }

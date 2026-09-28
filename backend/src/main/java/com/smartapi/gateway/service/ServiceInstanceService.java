@@ -3,6 +3,7 @@ package com.smartapi.gateway.service;
 import com.smartapi.gateway.dto.CreateServiceInstanceRequest;
 import com.smartapi.gateway.dto.ServiceInstanceResponse;
 import com.smartapi.gateway.entity.ApiService;
+import com.smartapi.gateway.entity.InstanceStatus;
 import com.smartapi.gateway.entity.ServiceInstance;
 import com.smartapi.gateway.exception.DuplicateResourceException;
 import com.smartapi.gateway.exception.InvalidRequestException;
@@ -10,6 +11,7 @@ import com.smartapi.gateway.exception.ResourceNotFoundException;
 import com.smartapi.gateway.repository.ApiServiceRepository;
 import com.smartapi.gateway.repository.ServiceInstanceRepository;
 import java.util.List;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,10 +24,14 @@ public class ServiceInstanceService {
     private final ServiceInstanceRepository instanceRepository;
     private final ApiServiceRepository serviceRepository;
 
+    private final ApplicationEventPublisher events;
+
     public ServiceInstanceService(ServiceInstanceRepository instanceRepository,
-                                  ApiServiceRepository serviceRepository) {
+                                  ApiServiceRepository serviceRepository,
+                                  ApplicationEventPublisher events) {
         this.instanceRepository = instanceRepository;
         this.serviceRepository = serviceRepository;
+        this.events = events;
     }
 
     @Transactional
@@ -40,6 +46,7 @@ public class ServiceInstanceService {
         }
         int weight = request.weight() != null ? request.weight() : DEFAULT_WEIGHT;
         ServiceInstance saved = instanceRepository.save(new ServiceInstance(service, host, request.port(), weight));
+        events.publishEvent(new RegistryChangedEvent("instance registered: " + host + ":" + request.port()));
         return ServiceInstanceResponse.from(saved);
     }
 
@@ -59,11 +66,25 @@ public class ServiceInstanceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Service instance", id));
     }
 
+    /**
+     * No explicit save(): the entity is "managed" inside the transaction, so Hibernate detects the
+     * changed field (dirty checking) and issues the UPDATE at commit.
+     */
+    @Transactional
+    public ServiceInstanceResponse updateStatus(Long id, InstanceStatus status) {
+        ServiceInstance instance = instanceRepository.findByIdWithService(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Service instance", id));
+        instance.changeStatus(status);
+        events.publishEvent(new RegistryChangedEvent("instance " + id + " status: " + status));
+        return ServiceInstanceResponse.from(instance);
+    }
+
     @Transactional
     public void delete(Long id) {
         if (!instanceRepository.existsById(id)) {
             throw new ResourceNotFoundException("Service instance", id);
         }
         instanceRepository.deleteById(id);
+        events.publishEvent(new RegistryChangedEvent("instance deleted: " + id));
     }
 }
