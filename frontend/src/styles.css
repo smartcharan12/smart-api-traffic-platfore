@@ -282,3 +282,11 @@ td.wrap {
 .chart-axis { fill: var(--muted); font-size: 11px; }
 .chart-legend { display: flex; gap: 16px; font-size: 0.8rem; color: var(--muted); }
 .chart-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
+
+/* ---- Phase 4: sign-in ---- */
+.header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.login { max-width: 380px; margin: 48px auto; padding: 0 16px; }
+.login h1 { font-size: 1.3rem; margin-bottom: 16px; }
+.login .form { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+button.link { background: none; border: none; color: var(--accent); padding: 0; align-self: flex-start; }
+.banner-info { background: #e8f0fe; border: 1px solid var(--accent); color: var(--text); padding: 8px 12px; border-radius: 6px; }

@@ -13,6 +13,7 @@ import type {
   Service,
   ServiceInstance,
 } from './types';
+import { getSession, setSession, type Session } from './auth';
 
 /**
  * Error thrown for any non-2xx response. The backend returns RFC 9457 problem+json, so we can
@@ -31,12 +32,20 @@ export class ApiError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
+    const session = getSession();
     response = await fetch(path, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session ? { Authorization: `Bearer ${session.token}` } : {}),
+        ...init?.headers,
+      },
     });
   } catch {
     throw new ApiError(0, 'Cannot reach the backend. Is it running on port 8080?');
+  }
+  if (response.status === 401 && getSession()) {
+    setSession(null); // expired or revoked: back to the login screen
   }
   if (!response.ok) {
     const problem = await response.json().catch(() => null);
@@ -50,6 +59,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  login: async (username: string, password: string): Promise<Session> => {
+    const r = await request<{ accessToken: string; username: string; role: 'ADMIN' | 'USER'; expiresAt: string }>(
+      '/api/auth/login',
+      { method: 'POST', body: JSON.stringify({ username, password }) },
+    );
+    return { token: r.accessToken, username: r.username, role: r.role, expiresAt: r.expiresAt };
+  },
+  register: (username: string, email: string, password: string) =>
+    request<unknown>('/api/auth/register', { method: 'POST', body: JSON.stringify({ username, email, password }) }),
+
   listServices: () => request<Service[]>('/api/services'),
   createService: (body: CreateServiceRequest) =>
     request<Service>('/api/services', { method: 'POST', body: JSON.stringify(body) }),
@@ -71,6 +90,11 @@ export const api = {
   trafficSummary: (minutes: number) => request<TrafficSummary>(`/api/traffic/summary?minutes=${minutes}`),
   failures: (minutes: number) => request<FailuresReport>(`/api/traffic/failures?minutes=${minutes}`),
   settings: () => request<GatewaySettings>('/api/gateway/settings'),
+  simulate: (instanceId: number, scenario: string) =>
+    request<{ address: string; scenario: string; backendStatus: number }>('/api/simulations', {
+      method: 'POST',
+      body: JSON.stringify({ instanceId, scenario }),
+    }),
   requestLogs: (filters: Record<string, string | number | undefined>) => {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([k, v]) => {

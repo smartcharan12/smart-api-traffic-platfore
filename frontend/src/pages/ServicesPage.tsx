@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { isAdmin } from '../api/auth';
 import { api, ApiError } from '../api/client';
 import type { Service, ServiceInstance } from '../api/types';
 import { InstancesTable } from '../components/InstancesTable';
@@ -46,6 +47,7 @@ export function ServicesPage() {
       <section>
         <h2>Services</h2>
         <ServicesTable
+          readOnly={!isAdmin()}
           services={services}
           instances={instances}
           onDelete={(s) => {
@@ -56,6 +58,7 @@ export function ServicesPage() {
       <section>
         <h2>Service instances</h2>
         <InstancesTable
+          readOnly={!isAdmin()}
           instances={instances}
           onDelete={(i) => {
             if (confirm(`Remove ${i.host}:${i.port}?`)) void runAndRefresh(() => api.deleteInstance(i.id));
@@ -67,10 +70,14 @@ export function ServicesPage() {
           }
         />
       </section>
-      <section className="forms">
-        <RegisterServiceForm onCreated={() => void refresh()} />
-        <RegisterInstanceForm services={services} onCreated={() => void refresh()} />
-      </section>
+      {isAdmin() ? (
+        <section className="forms">
+          <RegisterServiceForm onCreated={() => void refresh()} />
+          <RegisterInstanceForm services={services} onCreated={() => void refresh()} />
+        </section>
+      ) : (
+        <p className="muted">Signed in as USER: read-only. Registering, deleting and changing status require ADMIN.</p>
+      )}
     </>
   );
 }

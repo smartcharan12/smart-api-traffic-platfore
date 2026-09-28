@@ -1,10 +1,24 @@
-import { api } from '../api/client';
+import { isAdmin } from '../api/auth';
+import { useState } from 'react';
+import { api, ApiError } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
 import { fmtDuration, fmtMs, fmtTime } from '../components/Kpi';
 import { usePolling } from '../hooks/usePolling';
 
 export function HealthPage() {
   const { data, error, refresh } = usePolling(() => api.healthInstances(), 3000);
+
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function simulate(instanceId: number, scenario: string) {
+    try {
+      const r = await api.simulate(instanceId, scenario);
+      setMessage(`${scenario} applied to ${r.address} (backend answered ${r.backendStatus}). Watch status and circuit change.`);
+    } catch (e) {
+      setMessage(e instanceof ApiError ? e.message : String(e));
+    }
+    await refresh();
+  }
 
   async function checkNow() {
     await api.runHealthChecks();
@@ -20,10 +34,13 @@ export function HealthPage() {
         {data?.healthChecksEnabled ? 'enabled' : 'disabled'}.{' '}
         {data && !data.thisGatewayIsChecker && 'Another gateway holds the health-checker lease, so probe details are shown there.'}{' '}
         DEGRADED = slow or failing probes (still routable); DOWN = 3 consecutive failures (no traffic).
-        <button className="small" onClick={() => void checkNow()}>
-          Run checks now
-        </button>
+        {isAdmin() && (
+          <button className="small" onClick={() => void checkNow()}>
+            Run checks now
+          </button>
+        )}
       </p>
+      {message && <p className="banner-info">{message}</p>}
       <table>
         <thead>
           <tr>
@@ -38,6 +55,7 @@ export function HealthPage() {
             <th>Active conns</th>
             <th>Last heartbeat</th>
             <th>Last error</th>
+            {isAdmin() && <th>Simulate failure (demo services)</th>}
           </tr>
         </thead>
         <tbody>
@@ -58,6 +76,24 @@ export function HealthPage() {
               <td>{i.activeConnections}</td>
               <td>{fmtTime(i.lastHeartbeatAt)}</td>
               <td className="mono">{i.lastError ?? '—'}</td>
+              {isAdmin() && (
+                <td>
+                  <select
+                    aria-label={`Simulate a failure on ${i.address}`}
+                    value=""
+                    onChange={(e) => void simulate(i.instanceId, e.target.value)}
+                  >
+                    <option value="" disabled>
+                      Choose…
+                    </option>
+                    <option value="ERROR">HTTP 500 errors</option>
+                    <option value="SLOW">High latency (1.5 s)</option>
+                    <option value="TIMEOUT">Timeouts (8 s)</option>
+                    <option value="UNAVAILABLE">Unavailable (503, health too)</option>
+                    <option value="RECOVER">Recover</option>
+                  </select>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

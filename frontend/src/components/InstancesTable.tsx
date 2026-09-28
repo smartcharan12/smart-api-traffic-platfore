@@ -3,6 +3,8 @@ import { StatusBadge } from './StatusBadge';
 
 interface Props {
   instances: ServiceInstance[];
+  /** Hide change controls (the API enforces ADMIN-only changes anyway). */
+  readOnly?: boolean;
   onDelete: (instance: ServiceInstance) => void;
   onStatusChange: (instance: ServiceInstance, status: InstanceStatus) => void;
 }
@@ -12,7 +14,7 @@ const SETTABLE: InstanceStatus[] = ['HEALTHY', 'DEGRADED', 'DOWN'];
 
 const formatTime = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : 'never');
 
-export function InstancesTable({ instances, onDelete, onStatusChange }: Props) {
+export function InstancesTable({ instances, onDelete, onStatusChange, readOnly = false }: Props) {
   if (instances.length === 0) return <p className="empty">No instances registered yet.</p>;
   return (
     <table>
@@ -23,8 +25,8 @@ export function InstancesTable({ instances, onDelete, onStatusChange }: Props) {
           <th>Weight</th>
           <th>Status</th>
           <th>Last heartbeat</th>
-          <th>Set status</th>
-          <th />
+          {!readOnly && <th>Set status</th>}
+          {!readOnly && <th />}
         </tr>
       </thead>
       <tbody>
@@ -39,6 +41,7 @@ export function InstancesTable({ instances, onDelete, onStatusChange }: Props) {
               <StatusBadge status={instance.status} />
             </td>
             <td>{formatTime(instance.lastHeartbeatAt)}</td>
+            {!readOnly && (
             <td>
               <select
                 aria-label={`Set status of ${instance.host}:${instance.port}`}
@@ -55,11 +58,14 @@ export function InstancesTable({ instances, onDelete, onStatusChange }: Props) {
                 ))}
               </select>
             </td>
+            )}
+            {!readOnly && (
             <td>
               <button className="link-danger" onClick={() => onDelete(instance)}>
                 Remove
               </button>
             </td>
+            )}
           </tr>
         ))}
       </tbody>

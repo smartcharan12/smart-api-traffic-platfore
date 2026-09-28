@@ -3,10 +3,12 @@ import type { Service, ServiceInstance } from '../api/types';
 interface Props {
   services: Service[];
   instances: ServiceInstance[];
+  /** Hide change controls (the API enforces ADMIN-only changes anyway). */
+  readOnly?: boolean;
   onDelete: (service: Service) => void;
 }
 
-export function ServicesTable({ services, instances, onDelete }: Props) {
+export function ServicesTable({ services, instances, onDelete, readOnly = false }: Props) {
   if (services.length === 0) return <p className="empty">No services registered yet.</p>;
   return (
     <table>
@@ -17,7 +19,7 @@ export function ServicesTable({ services, instances, onDelete }: Props) {
           <th>Load balancing</th>
           <th>Instances (healthy / total)</th>
           <th>Description</th>
-          <th />
+          {!readOnly && <th />}
         </tr>
       </thead>
       <tbody>
@@ -33,11 +35,13 @@ export function ServicesTable({ services, instances, onDelete }: Props) {
                 {healthy} / {own.length}
               </td>
               <td>{service.description ?? '—'}</td>
-              <td>
-                <button className="link-danger" onClick={() => onDelete(service)}>
-                  Delete
-                </button>
-              </td>
+              {!readOnly && (
+                <td>
+                  <button className="link-danger" onClick={() => onDelete(service)}>
+                    Delete
+                  </button>
+                </td>
+              )}
             </tr>
           );
         })}
