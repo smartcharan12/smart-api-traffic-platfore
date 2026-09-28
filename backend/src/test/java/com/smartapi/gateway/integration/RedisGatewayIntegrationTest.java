@@ -58,6 +58,9 @@ class RedisGatewayIntegrationTest extends GatewayTestSupport {
     @Autowired
     private ServiceDiscovery serviceDiscovery;
 
+    @Autowired
+    private com.smartapi.gateway.redis.RegistryChangeSubscription subscription;
+
     private final List<StubBackend> backends = new ArrayList<>();
 
     @Override
@@ -144,6 +147,13 @@ class RedisGatewayIntegrationTest extends GatewayTestSupport {
         StubBackend a = backend("A");
         long instance = registerInstance(registerService("orders-service", "/orders", "ROUND_ROBIN"), a.port(), 1);
         assertThat(get("/gateway/orders/orders", "X-User-Id", "p1").statusCode()).isEqualTo(200); // route cached (TTL 10 min)
+
+        // Redis pub/sub drops messages published while nobody is subscribed (that's why the TTL remains
+        // the safety net). The subscription starts in the background, so wait for it first.
+        for (int i = 0; i < 100 && !subscription.isSubscribed(); i++) {
+            Thread.sleep(100);
+        }
+        assertThat(subscription.isSubscribed()).isTrue();
 
         // Another gateway marks the instance DOWN: the row changes in the shared database (not via this
         // gateway, so no local event) and that gateway publishes on the Redis channel.

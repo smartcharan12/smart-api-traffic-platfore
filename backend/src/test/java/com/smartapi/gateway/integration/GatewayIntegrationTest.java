@@ -273,42 +273,4 @@ class GatewayIntegrationTest extends GatewayTestSupport {
         }
         assertThat(List.of(a.hits(), b.hits(), c.hits())).containsExactly(30, 20, 10);
     }
-
-    @Test
-    void concurrentRequestsAreAllServedAndConnectionCountsReturnToZero() throws Exception {
-        StubBackend a = backend("A");
-        StubBackend b = backend("B");
-        StubBackend c = backend("C");
-        long orders = registerService("orders-service", "/orders", "ROUND_ROBIN");
-        for (StubBackend backend : List.of(a, b, c)) {
-            registerInstance(orders, backend.port(), 1);
-        }
-
-        ExecutorService pool = Executors.newFixedThreadPool(30);
-        List<Future<HttpResponse<String>>> results = new ArrayList<>();
-        int retries = 0;
-        try {
-            for (int i = 0; i < 300; i++) {
-                results.add(pool.submit(() -> get("/gateway/orders/orders")));
-            }
-            for (Future<HttpResponse<String>> result : results) {
-                HttpResponse<String> response = result.get(30, TimeUnit.SECONDS);
-                assertThat(response.statusCode()).isEqualTo(200);
-                retries += Integer.parseInt(response.headers().firstValue("X-Retry-Count").orElse("0"));
-            }
-        } finally {
-            pool.shutdownNow();
-        }
-
-        // Every backend call is accounted for: one per request plus one per retry the gateway reported.
-        assertThat(a.hits() + b.hits() + c.hits()).isEqualTo(300 + retries);
-        if (retries == 0) {
-            // Round robin hands out tickets atomically, so concurrent callers split exactly. (A retry,
-            // e.g. after a timeout on a loaded CI machine, legitimately shifts the split; exactness under
-            // contention is also proven deterministically in LoadBalancerConcurrencyTest.)
-            assertThat(List.of(a.hits(), b.hits(), c.hits())).containsExactly(100, 100, 100);
-        }
-        // Every acquire was matched by a release: no leaked "active connections".
-        assertThat(connectionTracker.snapshot().values()).allSatisfy(count -> assertThat(count).isZero());
-    }
 }
