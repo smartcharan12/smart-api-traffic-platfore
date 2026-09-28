@@ -3,6 +3,7 @@ package com.smartapi.gateway.support;
 import com.smartapi.gateway.config.GatewayProperties;
 import com.smartapi.gateway.ratelimit.RateLimitAlgorithm;
 import com.smartapi.gateway.ratelimit.RateLimitDimension;
+import com.smartapi.gateway.ratelimit.RateLimitStore;
 import java.time.Duration;
 import java.util.List;
 
@@ -18,7 +19,7 @@ public final class TestProperties {
 
     public static GatewayProperties.RateLimit rateLimit(List<RateLimitDimension> keyBy) {
         return new GatewayProperties.RateLimit(true, RateLimitAlgorithm.TOKEN_BUCKET, 100, Duration.ofMinutes(1),
-                keyBy, false);
+                keyBy, false, RateLimitStore.LOCAL);
     }
 
     public static GatewayProperties.CircuitBreaker circuitBreaker() {
@@ -32,11 +33,13 @@ public final class TestProperties {
 
     public static GatewayProperties withKeyBy(RateLimitDimension... dimensions) {
         return new GatewayProperties(proxy(), rateLimit(List.of(dimensions)),
-                new GatewayProperties.Discovery(Duration.ofSeconds(5)), circuitBreaker(), retry());
+                new GatewayProperties.Discovery(Duration.ofSeconds(5)), circuitBreaker(), retry(),
+                new GatewayProperties.Cache(true, Duration.ofMinutes(5), 262_144));
     }
 
     public static GatewayProperties withDiscoveryTtl(Duration ttl) {
         return new GatewayProperties(proxy(), rateLimit(List.of(RateLimitDimension.IP)),
-                new GatewayProperties.Discovery(ttl), circuitBreaker(), retry());
+                new GatewayProperties.Discovery(ttl), circuitBreaker(), retry(),
+                new GatewayProperties.Cache(true, Duration.ofMinutes(5), 262_144));
     }
 }

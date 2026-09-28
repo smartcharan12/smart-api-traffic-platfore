@@ -1,15 +1,20 @@
 package com.smartapi.gateway.config;
 
+import com.smartapi.gateway.ratelimit.FallbackRateLimiter;
 import com.smartapi.gateway.ratelimit.FixedWindowRateLimiter;
 import com.smartapi.gateway.ratelimit.NoOpRateLimiter;
+import com.smartapi.gateway.ratelimit.RateLimitStore;
 import com.smartapi.gateway.ratelimit.RateLimiter;
+import com.smartapi.gateway.ratelimit.RedisRateLimiter;
 import com.smartapi.gateway.ratelimit.SlidingWindowRateLimiter;
 import com.smartapi.gateway.ratelimit.TokenBucketRateLimiter;
+import com.smartapi.gateway.redis.RedisGuard;
 import java.net.http.HttpClient;
 import java.time.Clock;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestClient;
@@ -46,15 +51,21 @@ public class GatewayConfig {
      * knows which implementation is used. Switching algorithm is a config change, not a code change.
      */
     @Bean
-    public RateLimiter rateLimiter(GatewayProperties properties, Clock clock) {
+    public RateLimiter rateLimiter(GatewayProperties properties, Clock clock, StringRedisTemplate redis,
+                                   RedisGuard redisGuard) {
         GatewayProperties.RateLimit config = properties.rateLimit();
         if (!config.enabled()) {
             return new NoOpRateLimiter();
         }
-        return switch (config.algorithm()) {
+        RateLimiter local = switch (config.algorithm()) {
             case FIXED_WINDOW -> new FixedWindowRateLimiter(config.limit(), config.window(), clock);
             case SLIDING_WINDOW -> new SlidingWindowRateLimiter(config.limit(), config.window(), clock);
             case TOKEN_BUCKET -> TokenBucketRateLimiter.forRate(config.limit(), config.window(), clock);
         };
+        if (config.store() == RateLimitStore.LOCAL) {
+            return local;
+        }
+        RateLimiter shared = new RedisRateLimiter(redis, config.algorithm(), config.limit(), config.window(), clock);
+        return new FallbackRateLimiter(shared, local, redisGuard);
     }
 }

@@ -2,6 +2,7 @@ package com.smartapi.gateway.config;
 
 import com.smartapi.gateway.ratelimit.RateLimitAlgorithm;
 import com.smartapi.gateway.ratelimit.RateLimitDimension;
+import com.smartapi.gateway.ratelimit.RateLimitStore;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -21,7 +22,20 @@ import org.springframework.validation.annotation.Validated;
 public record GatewayProperties(@Valid @DefaultValue Proxy proxy, @Valid @DefaultValue RateLimit rateLimit,
                                 @Valid @DefaultValue Discovery discovery,
                                 @Valid @DefaultValue CircuitBreaker circuitBreaker,
-                                @Valid @DefaultValue Retry retry) {
+                                @Valid @DefaultValue Retry retry,
+                                @Valid @DefaultValue Cache cache) {
+
+    /**
+     * Shared response cache (Redis) for GET responses the backend marks cacheable via Cache-Control.
+     *
+     * @param maxTtl       upper bound on the backend's max-age
+     * @param maxBodyBytes larger responses are not cached
+     */
+    public record Cache(
+            @DefaultValue("true") boolean enabled,
+            @DefaultValue("5m") Duration maxTtl,
+            @DefaultValue("262144") @Min(1) int maxBodyBytes) {
+    }
 
     /**
      * Per-backend circuit breaker. {@code failureStatuses} are backend responses that count as failures
@@ -77,6 +91,7 @@ public record GatewayProperties(@Valid @DefaultValue Proxy proxy, @Valid @Defaul
             @DefaultValue("100") @Min(1) int limit,
             @DefaultValue("1m") Duration window,
             @DefaultValue("IP") @NotEmpty List<RateLimitDimension> keyBy,
-            @DefaultValue("false") boolean trustForwardedFor) {
+            @DefaultValue("false") boolean trustForwardedFor,
+            @DefaultValue("LOCAL") RateLimitStore store) {
     }
 }

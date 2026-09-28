@@ -23,6 +23,13 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+      # Short timeouts: Redis is an optimisation. A slow Redis must not make every request slow;
+      # RedisGuard falls back after a few failures.
+      timeout: 250ms
+      connect-timeout: 500ms
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -60,6 +67,10 @@ gateway:
     budget-max-tokens: 20
   discovery:
     cache-ttl: 5s              # reuse route lookups; registry changes via this gateway apply immediately
+  cache:                       # shared Redis response cache; only what the backend marks cacheable
+    enabled: true
+    max-ttl: 5m
+    max-body-bytes: 262144
   rate-limit:
     enabled: true
     algorithm: TOKEN_BUCKET    # FIXED_WINDOW | SLIDING_WINDOW | TOKEN_BUCKET
@@ -67,8 +78,12 @@ gateway:
     window: 1m
     key-by: IP                 # any of IP, USER, ENDPOINT, e.g. "USER,ENDPOINT"
     trust-forwarded-for: false # only true behind a proxy you control (see ClientIpResolver)
+    store: ${RATE_LIMIT_STORE:REDIS}  # REDIS = shared by all gateways (local fallback while Redis is down); LOCAL
 
 management:
+  health:
+    redis:
+      enabled: false   # Redis is optional (see RedisGuard); /api/health reports it without failing liveness
   endpoints:
     web:
       exposure:
