@@ -3,6 +3,7 @@ package com.smartapi.gateway.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -132,6 +133,28 @@ class RegistryApiIntegrationTest extends PostgresIntegrationTest {
         mockMvc.perform(get("/api/services/" + ordersId)).andExpect(status().isNotFound());
         Integer remaining = jdbcTemplate.queryForObject("SELECT count(*) FROM service_instances", Integer.class);
         assertThat(remaining).isZero();
+    }
+
+    @Test
+    void patchStatusChangesInstanceStatus() throws Exception {
+        long ordersId = createService("orders-service", "/orders");
+        createInstance(ordersId, 9001, 1);
+
+        mockMvc.perform(patch("/api/service-instances/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"DOWN\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DOWN"));
+        mockMvc.perform(get("/api/service-instances/1")).andExpect(jsonPath("$.status").value("DOWN"));
+
+        mockMvc.perform(patch("/api/service-instances/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"BROKEN\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(patch("/api/service-instances/99/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"DOWN\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
