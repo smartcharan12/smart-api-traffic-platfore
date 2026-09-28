@@ -1,0 +1,7 @@
+# One codebase, three services. Choose which one this process is, and its port, at launch:
+#   java -jar demo-service.jar --demo.service-name=orders-service --server.port=9001
+demo:
+  service-name: ${DEMO_SERVICE_NAME:orders-service}
+
+server:
+  port: ${SERVER_PORT:9001}

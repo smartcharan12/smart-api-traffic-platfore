@@ -18,3 +18,6 @@ dist/
 *.iml
 .vscode/
 .DS_Store
+
+# Demo service logs and PIDs (scripts/start-demo-services.sh)
+.demo/
