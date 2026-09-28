@@ -23,6 +23,10 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+          # request_logs are written in batches (RequestLogWriter); works because their ids come
+          # from a pooled sequence, not IDENTITY (see V1 migration)
+          batch_size: 100
+        order_inserts: true
   data:
     redis:
       url: ${REDIS_URL:redis://localhost:6379}
@@ -76,6 +80,11 @@ gateway:
     unhealthy-threshold: 3     # consecutive failures -> DOWN
     healthy-threshold: 2       # consecutive successes before DOWN -> HEALTHY
     threads: 8
+  request-log:                 # persisted request_logs rows (async, batched, bounded queue)
+    enabled: true
+    queue-capacity: 10000      # full queue -> rows dropped and counted, requests never wait
+    batch-size: 500
+    retention: 7d
   cache:                       # shared Redis response cache; only what the backend marks cacheable
     enabled: true
     max-ttl: 5m

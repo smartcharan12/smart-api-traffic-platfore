@@ -7,6 +7,7 @@ import com.smartapi.gateway.exception.NoHealthyInstanceException;
 import com.smartapi.gateway.exception.RateLimitExceededException;
 import com.smartapi.gateway.exception.RouteNotFoundException;
 import com.smartapi.gateway.loadbalancer.BackendInstance;
+import com.smartapi.gateway.logging.RequestLogWriter;
 import com.smartapi.gateway.ratelimit.RateLimitDecision;
 import com.smartapi.gateway.ratelimit.RateLimitKeyResolver;
 import com.smartapi.gateway.ratelimit.RateLimiter;
@@ -43,11 +44,12 @@ public class GatewayService {
     private final ResponseCache responseCache;
     private final ResponseCachePolicy cachePolicy;
     private final Clock clock;
+    private final RequestLogWriter requestLogWriter;
 
     public GatewayService(RouteResolver routeResolver, RateLimiter rateLimiter,
                           RateLimitKeyResolver rateLimitKeyResolver, ServiceDiscovery serviceDiscovery,
                           HealthFilter healthFilter, ResilientForwarder forwarder, ResponseCache responseCache,
-                          ResponseCachePolicy cachePolicy, Clock clock) {
+                          ResponseCachePolicy cachePolicy, Clock clock, RequestLogWriter requestLogWriter) {
         this.routeResolver = routeResolver;
         this.rateLimiter = rateLimiter;
         this.rateLimitKeyResolver = rateLimitKeyResolver;
@@ -57,6 +59,7 @@ public class GatewayService {
         this.responseCache = responseCache;
         this.cachePolicy = cachePolicy;
         this.clock = clock;
+        this.requestLogWriter = requestLogWriter;
     }
 
     public GatewayResponse handle(GatewayRequest request) {
@@ -88,6 +91,7 @@ public class GatewayService {
             DiscoveredService service = serviceDiscovery.find(route.basePath())
                     .orElseThrow(() -> new RouteNotFoundException(route.basePath()));
             accessLog.service(service.name());
+            accessLog.ids(service.id(), null);
 
             List<BackendInstance> routable = healthFilter.routable(service.instances());
             if (routable.isEmpty()) {
@@ -113,6 +117,12 @@ public class GatewayService {
             throw e;
         } finally {
             accessLog.write();
+            try {
+                requestLogWriter.submit(accessLog.toEntity(clock.instant()));
+            } catch (RuntimeException e) {
+                // An exception thrown from finally would replace the request's own outcome.
+                org.slf4j.LoggerFactory.getLogger(GatewayService.class).warn("Could not record request log", e);
+            }
         }
     }
 

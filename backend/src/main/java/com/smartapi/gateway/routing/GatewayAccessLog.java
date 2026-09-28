@@ -22,6 +22,8 @@ final class GatewayAccessLog {
     private final GatewayRequest request;
     private final long startNanos = System.nanoTime(); // monotonic: immune to wall-clock adjustments
     private String service = "-";
+    private Long serviceId;
+    private Long instanceId;
     private String instance = "-";
     private int attempts;
     private int retries;
@@ -43,6 +45,35 @@ final class GatewayAccessLog {
     void attempt(String address) {
         this.instance = address;
         this.attempts++;
+    }
+
+    void ids(Long serviceId, Long instanceId) {
+        if (serviceId != null) {
+            this.serviceId = serviceId;
+        }
+        if (instanceId != null) {
+            this.instanceId = instanceId;
+        }
+    }
+
+    /** The same facts as the log line, as a row for request_logs. */
+    com.smartapi.gateway.entity.RequestLog toEntity(java.time.Instant at) {
+        String requestId = RequestIdFilter.currentRequestId();
+        java.util.UUID uuid;
+        try {
+            uuid = java.util.UUID.fromString(requestId);
+        } catch (RuntimeException e) {
+            // Client-supplied ids aren't always UUIDs; derive a stable UUID so the column type holds.
+            uuid = java.util.UUID.nameUUIDFromBytes(String.valueOf(requestId).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+        String reason = !failures.isEmpty() ? String.join(",", failures) : ("-".equals(error) ? null : error);
+        if (reason != null && reason.length() > 500) {
+            reason = reason.substring(0, 500);
+        }
+        String path = request.path().length() > 2048 ? request.path().substring(0, 2048) : request.path();
+        return new com.smartapi.gateway.entity.RequestLog(uuid, null, serviceId, instanceId, request.method(), path,
+                request.clientIp(), status, (int) ((System.nanoTime() - startNanos) / 1_000_000), retries, reason, at)
+                .withClientId(request.userId());
     }
 
     void cache(String result) {

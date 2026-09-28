@@ -97,6 +97,7 @@ public class ResilientForwarder {
             }
 
             trace.attempt(target.address());
+            trace.ids(null, target.id());
             FailureKind failure;
             try {
                 GatewayResponse response = proxyClient.forward(target, request, route.downstreamPath());

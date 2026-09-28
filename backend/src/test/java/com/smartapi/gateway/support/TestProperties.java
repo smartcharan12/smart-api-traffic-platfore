@@ -39,12 +39,14 @@ public final class TestProperties {
     public static GatewayProperties withKeyBy(RateLimitDimension... dimensions) {
         return new GatewayProperties(proxy(), rateLimit(List.of(dimensions)),
                 new GatewayProperties.Discovery(Duration.ofSeconds(5)), circuitBreaker(), retry(),
-                new GatewayProperties.Cache(true, Duration.ofMinutes(5), 262_144), healthCheck());
+                new GatewayProperties.Cache(true, Duration.ofMinutes(5), 262_144), healthCheck(),
+                new GatewayProperties.RequestLog(false, 100, 10, Duration.ofDays(7)));
     }
 
     public static GatewayProperties withDiscoveryTtl(Duration ttl) {
         return new GatewayProperties(proxy(), rateLimit(List.of(RateLimitDimension.IP)),
                 new GatewayProperties.Discovery(ttl), circuitBreaker(), retry(),
-                new GatewayProperties.Cache(true, Duration.ofMinutes(5), 262_144), healthCheck());
+                new GatewayProperties.Cache(true, Duration.ofMinutes(5), 262_144), healthCheck(),
+                new GatewayProperties.RequestLog(false, 100, 10, Duration.ofDays(7)));
     }
 }

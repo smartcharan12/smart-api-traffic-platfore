@@ -24,7 +24,21 @@ public record GatewayProperties(@Valid @DefaultValue Proxy proxy, @Valid @Defaul
                                 @Valid @DefaultValue CircuitBreaker circuitBreaker,
                                 @Valid @DefaultValue Retry retry,
                                 @Valid @DefaultValue Cache cache,
-                                @Valid @DefaultValue HealthCheck healthCheck) {
+                                @Valid @DefaultValue HealthCheck healthCheck,
+                                @Valid @DefaultValue RequestLog requestLog) {
+
+    /**
+     * Persisted request logs (asynchronous, batched).
+     *
+     * @param queueCapacity entries waiting to be written; when full, new entries are dropped (and counted)
+     * @param retention     rows older than this are deleted hourly
+     */
+    public record RequestLog(
+            @DefaultValue("true") boolean enabled,
+            @DefaultValue("10000") @Min(1) int queueCapacity,
+            @DefaultValue("500") @Min(1) int batchSize,
+            @DefaultValue("7d") Duration retention) {
+    }
 
     /**
      * Active health checks: GET {service.healthCheckPath} on every instance, every {@code interval}.

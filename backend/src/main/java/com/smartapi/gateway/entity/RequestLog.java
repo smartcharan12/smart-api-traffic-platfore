@@ -64,6 +64,9 @@ public class RequestLog {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "client_id", length = 100)
+    private String clientId;
+
     protected RequestLog() {
     }
 
@@ -82,6 +85,16 @@ public class RequestLog {
         this.retryCount = retryCount;
         this.failureReason = failureReason;
         this.createdAt = createdAt;
+    }
+
+    /** The caller identity used for rate limiting (X-User-Id / JWT subject); not necessarily a user row. */
+    public RequestLog withClientId(String clientId) {
+        this.clientId = clientId;
+        return this;
+    }
+
+    public String getClientId() {
+        return clientId;
     }
 
     public Long getId() {
