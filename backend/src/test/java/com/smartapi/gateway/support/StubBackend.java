@@ -25,6 +25,7 @@ public final class StubBackend implements AutoCloseable {
     private volatile Mode mode = Mode.OK;
     private volatile long delayMs;
     private volatile String lastRequestId;
+    private volatile String cacheControl;
 
     private StubBackend(String name) throws IOException {
         this.name = name;
@@ -64,6 +65,9 @@ public final class StubBackend implements AutoCloseable {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");
         exchange.getResponseHeaders().set("X-Backend", name);
+        if (cacheControl != null) {
+            exchange.getResponseHeaders().set("Cache-Control", cacheControl);
+        }
         int status = switch (mode) { case ERROR -> 500; case UNAVAILABLE -> 503; default -> 200; };
         exchange.sendResponseHeaders(status, bytes.length);
         exchange.getResponseBody().write(bytes);
@@ -73,6 +77,10 @@ public final class StubBackend implements AutoCloseable {
     public void mode(Mode mode, long delayMs) {
         this.mode = mode;
         this.delayMs = delayMs;
+    }
+
+    public void cacheControl(String value) {
+        this.cacheControl = value;
     }
 
     public int port() {

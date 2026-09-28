@@ -26,6 +26,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "gateway.rate-limit.enabled=false",
+        "gateway.cache.enabled=false",
+        "gateway.rate-limit.store=LOCAL",
+        "spring.data.redis.url=redis://127.0.0.1:1",
         "gateway.proxy.connect-timeout=500ms",
         "gateway.proxy.response-timeout=500ms",
         "gateway.circuit-breaker.enabled=true"})

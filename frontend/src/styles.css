@@ -133,6 +133,7 @@ th {
 
 .health-up { color: var(--healthy); border-color: var(--healthy); }
 .health-down { color: var(--down); border-color: var(--down); }
+.health-degraded { color: var(--degraded); border-color: var(--degraded); }
 
 .forms {
   display: grid;

@@ -30,6 +30,7 @@ final class GatewayAccessLog {
     private String rateLimit = "-";
     private String remaining = "-";
     private String error = "-";
+    private String cache = "-";
 
     GatewayAccessLog(GatewayRequest request) {
         this.request = request;
@@ -42,6 +43,10 @@ final class GatewayAccessLog {
     void attempt(String address) {
         this.instance = address;
         this.attempts++;
+    }
+
+    void cache(String result) {
+        this.cache = result;
     }
 
     void retry() {
@@ -80,10 +85,10 @@ final class GatewayAccessLog {
     void write() {
         long latencyMs = (System.nanoTime() - startNanos) / 1_000_000;
         String line = "requestId=%s method=%s path=%s client=%s user=%s service=%s instance=%s attempts=%d "
-                + "retries=%d status=%d latencyMs=%d rateLimit=%s remaining=%s failures=%s error=%s";
+                + "retries=%d status=%d latencyMs=%d rateLimit=%s remaining=%s cache=%s failures=%s error=%s";
         Object[] args = {RequestIdFilter.currentRequestId(), request.method(), request.path(), request.clientIp(),
                 request.userId() == null ? "-" : request.userId(), service, instance, attempts, retries, status,
-                latencyMs, rateLimit, remaining, failures.isEmpty() ? "-" : String.join(",", failures), error};
+                latencyMs, rateLimit, remaining, cache, failures.isEmpty() ? "-" : String.join(",", failures), error};
         if (status >= 500) {
             log.warn(line.formatted(args));
         } else {

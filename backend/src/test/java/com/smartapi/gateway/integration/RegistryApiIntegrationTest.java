@@ -20,7 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** Full stack: HTTP -> controller -> service -> JPA -> real PostgreSQL (schema from Flyway). */
-@SpringBootTest
+@SpringBootTest(properties = "spring.data.redis.url=redis://127.0.0.1:1")
 @AutoConfigureMockMvc
 class RegistryApiIntegrationTest extends PostgresIntegrationTest {
 
@@ -161,8 +161,10 @@ class RegistryApiIntegrationTest extends PostgresIntegrationTest {
     void healthReportsDatabaseUp() throws Exception {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"))
-                .andExpect(jsonPath("$.components.database").value("UP"));
+                // No Redis in this test: DEGRADED (still 200), because Redis is optional.
+                .andExpect(jsonPath("$.status").value("DEGRADED"))
+                .andExpect(jsonPath("$.components.database").value("UP"))
+                .andExpect(jsonPath("$.components.redis").value("DOWN"));
     }
 
     @Test

@@ -26,7 +26,7 @@ export interface ServiceInstance {
 }
 
 export interface Health {
-  status: 'UP' | 'DOWN';
+  status: 'UP' | 'DEGRADED' | 'DOWN';
   components: Record<string, 'UP' | 'DOWN'>;
   timestamp: string;
 }

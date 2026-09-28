@@ -1,5 +1,7 @@
 package com.smartapi.gateway.routing;
 
+import com.smartapi.gateway.cache.ResponseCache;
+import com.smartapi.gateway.cache.ResponseCachePolicy;
 import com.smartapi.gateway.exception.GatewayException;
 import com.smartapi.gateway.exception.NoHealthyInstanceException;
 import com.smartapi.gateway.exception.RateLimitExceededException;
@@ -8,7 +10,9 @@ import com.smartapi.gateway.loadbalancer.BackendInstance;
 import com.smartapi.gateway.ratelimit.RateLimitDecision;
 import com.smartapi.gateway.ratelimit.RateLimitKeyResolver;
 import com.smartapi.gateway.ratelimit.RateLimiter;
+import java.time.Clock;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +21,7 @@ import org.springframework.stereotype.Service;
  * <pre>
  *  1. RouteResolver      /gateway/orders/orders/1 -> service "/orders", path "/orders/1"   (400 if malformed)
  *  2. RateLimiter        may this client send another request?                             (429)
+ *  2b. ResponseCache     GET the backend marked cacheable? serve the shared copy       (X-Cache: HIT)
  *  3. ServiceDiscovery   which instances does "/orders" have?                              (404 if no service)
  *  4. HealthFilter       drop DOWN instances                                               (503 if none left)
  *  5. ResilientForwarder circuit breaker -> load balancer -> proxy, with retries          (503 circuit open)
@@ -35,16 +40,23 @@ public class GatewayService {
     private final ServiceDiscovery serviceDiscovery;
     private final HealthFilter healthFilter;
     private final ResilientForwarder forwarder;
+    private final ResponseCache responseCache;
+    private final ResponseCachePolicy cachePolicy;
+    private final Clock clock;
 
     public GatewayService(RouteResolver routeResolver, RateLimiter rateLimiter,
                           RateLimitKeyResolver rateLimitKeyResolver, ServiceDiscovery serviceDiscovery,
-                          HealthFilter healthFilter, ResilientForwarder forwarder) {
+                          HealthFilter healthFilter, ResilientForwarder forwarder, ResponseCache responseCache,
+                          ResponseCachePolicy cachePolicy, Clock clock) {
         this.routeResolver = routeResolver;
         this.rateLimiter = rateLimiter;
         this.rateLimitKeyResolver = rateLimitKeyResolver;
         this.serviceDiscovery = serviceDiscovery;
         this.healthFilter = healthFilter;
         this.forwarder = forwarder;
+        this.responseCache = responseCache;
+        this.cachePolicy = cachePolicy;
+        this.clock = clock;
     }
 
     public GatewayResponse handle(GatewayRequest request) {
@@ -60,6 +72,19 @@ public class GatewayService {
                 throw new RateLimitExceededException(decision);
             }
 
+            Optional<String> cacheKey = cachePolicy.keyFor(request, route);
+            if (cacheKey.isPresent()) {
+                Optional<ResponseCache.CachedResponse> hit = responseCache.get(cacheKey.get());
+                if (hit.isPresent()) {
+                    accessLog.cache("HIT");
+                    GatewayResponse cached = fromCache(hit.get());
+                    addRateLimitHeaders(cached.headers(), decision);
+                    accessLog.status(cached.status());
+                    return cached;
+                }
+                accessLog.cache("MISS");
+            }
+
             DiscoveredService service = serviceDiscovery.find(route.basePath())
                     .orElseThrow(() -> new RouteNotFoundException(route.basePath()));
             accessLog.service(service.name());
@@ -72,6 +97,10 @@ public class GatewayService {
             GatewayResponse response = forwarder.forward(request, route, service, routable, accessLog);
             addRateLimitHeaders(response.headers(), decision);
             response.headers().set("X-Retry-Count", String.valueOf(accessLog.retries()));
+            if (cacheKey.isPresent()) {
+                cachePolicy.ttlFor(response).ifPresent(ttl -> responseCache.put(cacheKey.get(), response, ttl));
+                response.headers().set("X-Cache", "MISS");
+            }
             accessLog.status(response.status());
             return response;
         } catch (GatewayException e) {
@@ -85,6 +114,16 @@ public class GatewayService {
         } finally {
             accessLog.write();
         }
+    }
+
+    /** A copy with X-Cache: HIT and Age (seconds since stored), so the shared entry is never mutated. */
+    private GatewayResponse fromCache(ResponseCache.CachedResponse hit) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.addAll(hit.response().headers());
+        headers.set("X-Cache", "HIT");
+        headers.set(HttpHeaders.AGE, String.valueOf(Math.max(0, (clock.millis() - hit.storedAtEpochMillis()) / 1000)));
+        headers.set("X-Retry-Count", "0");
+        return new GatewayResponse(hit.response().status(), headers, hit.response().body());
     }
 
     private static void addRateLimitHeaders(HttpHeaders headers, RateLimitDecision decision) {
