@@ -28,7 +28,7 @@ public class RedisRateLimiter implements RateLimiter {
     private final int limit;
     private final long windowMillis;
     private final Clock clock;
-    private final DefaultRedisScript<List> script;
+    private final DefaultRedisScript<List<Long>> script;
     private final String prefix;
 
     public RedisRateLimiter(StringRedisTemplate redis, RateLimitAlgorithm algorithm, int limit, Duration window,
@@ -44,12 +44,20 @@ public class RedisRateLimiter implements RateLimiter {
         String name = algorithm.name().toLowerCase(Locale.ROOT);
         this.script = new DefaultRedisScript<>();
         this.script.setLocation(new ClassPathResource("redis/" + name + ".lua"));
-        this.script.setResultType(List.class);
+        this.script.setResultType(listOfLong());
         this.prefix = "rl:" + name + ":";
     }
 
-    @Override
+    /**
+     * Java generics are erased at runtime, so there is no {@code List<Long>.class}. The cast is safe:
+     * Redis returns a Lua table of integers as a List of Longs.
+     */
     @SuppressWarnings("unchecked")
+    private static Class<List<Long>> listOfLong() {
+        return (Class<List<Long>>) (Class<?>) List.class;
+    }
+
+    @Override
     public RateLimitDecision tryAcquire(String key) {
         long now = clock.millis();
         List<String> keys = List.of(prefix + key);

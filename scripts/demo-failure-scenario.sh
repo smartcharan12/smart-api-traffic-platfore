@@ -36,7 +36,7 @@ print(f\"health={i['status']:<9} circuit={i['circuitState']:<9} failures_in_a_ro
 }
 
 STOP=$(mktemp); rm -f "$STOP"
-for w in 1 2 3; do
+for _ in 1 2 3; do
   (while [[ ! -f $STOP ]]; do curl -s -o /dev/null "$GATEWAY/gateway/orders/orders"; sleep 0.1; done) &
 done
 trap 'touch $STOP; wait; rm -f $STOP; simulate RECOVER || true' EXIT

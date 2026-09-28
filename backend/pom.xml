@@ -138,6 +138,18 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <!-- Static check: every javac lint warning is shown, and CI fails on any warning (-Werror). -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <showWarnings>true</showWarnings>
+                    <compilerArgs>
+                        <arg>-Xlint:all,-processing,-serial</arg>
+                        <arg>-Werror</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
             <!-- Exposes each dependency's jar path as a property, e.g. ${org.mockito:mockito-core:jar} -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

@@ -81,7 +81,8 @@ public final class RedisTestSupport {
                     .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
             Runtime.getRuntime().addShutdownHook(new Thread(process::destroy));
             for (int i = 0; i < 100; i++) {
-                try (Socket ignored = new Socket("127.0.0.1", port)) {
+                try {
+                    new Socket("127.0.0.1", port).close(); // port accepts connections: Redis is up
                     return "redis://127.0.0.1:" + port;
                 } catch (IOException notYet) {
                     TimeUnit.MILLISECONDS.sleep(50);
