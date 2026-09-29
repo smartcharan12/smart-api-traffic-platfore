@@ -1,0 +1,5 @@
+# Build context = only what the Dockerfile copies; keeps builds fast and images clean.
+target/
+*.log
+.idea/
+*.iml
