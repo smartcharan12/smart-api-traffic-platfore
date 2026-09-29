@@ -59,7 +59,10 @@ public class TokenBucketRateLimiter implements RateLimiter {
                 long waitMillis = (long) Math.ceil((REQUEST_COST - tokens) / refillPerMilli);
                 decision[0] = RateLimitDecision.reject(capacity, Duration.ofMillis(waitMillis));
             }
-            return new Bucket(tokens, now);
+            // Never move lastRefill backwards: a thread that read the clock earlier may run compute()
+            // after one that read it later; storing its older time would credit that interval twice.
+            long refilledUpTo = bucket == null ? now : Math.max(bucket.lastRefillMillis(), now);
+            return new Bucket(tokens, refilledUpTo);
         });
         return decision[0];
     }

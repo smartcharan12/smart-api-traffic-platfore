@@ -53,6 +53,23 @@ class TokenBucketRateLimiterTest {
         assertThat(allowed).isEqualTo(100);                  // 10 s x 10 tokens/s
     }
 
+    /**
+     * Under load, requests reach the limiter in a different order than they read the clock. A request
+     * carrying an OLDER timestamp must not move the refill point backwards, or the interval between the
+     * two timestamps is credited twice. (Regression: the Phase 4 load test allowed 557 requests where a
+     * 100/min bucket should allow ~118.)
+     */
+    @Test
+    void outOfOrderTimestampsDoNotDoubleCountRefill() {
+        drain();                                             // t = 0: empty
+        clock.advance(Duration.ofMillis(500));               // t = 500: 5 tokens refilled
+        assertThat(countAllowed(1)).isEqualTo(1);            // 4 left, refilled up to 500
+        clock.advance(Duration.ofMillis(-300));              // a request that read the clock at t = 200
+        assertThat(countAllowed(1)).isEqualTo(1);            // 3 left
+        clock.advance(Duration.ofMillis(300));               // back to t = 500: nothing new to refill
+        assertThat(countAllowed(10)).isEqualTo(3);           // bug: would be 6 (200..500 credited again)
+    }
+
     @Test
     void forRateMatchesLimitPerWindow() {
         TokenBucketRateLimiter perMinute = TokenBucketRateLimiter.forRate(60, Duration.ofMinutes(1), clock);

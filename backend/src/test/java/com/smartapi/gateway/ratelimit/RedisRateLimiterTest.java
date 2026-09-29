@@ -120,6 +120,28 @@ class RedisRateLimiterTest {
         assertThat(limiter.tryAcquire("alice").allowed()).isTrue();  // 1.0 token
     }
 
+    /** Same regression as the in-memory bucket: scripts may run out of timestamp order under load. */
+    @Test
+    void tokenBucketIgnoresOutOfOrderTimestamps() {
+        RedisRateLimiter limiter = new RedisRateLimiter(redis, RateLimitAlgorithm.TOKEN_BUCKET, 10,
+                Duration.ofSeconds(1), clock);                      // 10 tokens, 10 per second
+        for (int i = 0; i < 10; i++) {
+            limiter.tryAcquire("bob");
+        }
+        clock.advance(Duration.ofMillis(500));                      // 5 tokens
+        assertThat(limiter.tryAcquire("bob").allowed()).isTrue();
+        clock.advance(Duration.ofMillis(-300));                     // older timestamp arrives later
+        assertThat(limiter.tryAcquire("bob").allowed()).isTrue();
+        clock.advance(Duration.ofMillis(300));
+        int allowed = 0;
+        for (int i = 0; i < 10; i++) {
+            if (limiter.tryAcquire("bob").allowed()) {
+                allowed++;
+            }
+        }
+        assertThat(allowed).isEqualTo(3);                           // bug: 6
+    }
+
     /**
      * Why Redis: two gateways, alternating requests from one client. With in-memory limiters each
      * gateway has its own bucket and the client gets TWICE the limit. With Redis they share one bucket.

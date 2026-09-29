@@ -11,6 +11,10 @@ if tokens == nil then
   ts = now
 end
 tokens = math.min(capacity, tokens + math.max(0, now - ts) * rate)
+-- Never move the refill timestamp backwards. Gateway threads read "now" before their script runs, so
+-- scripts can arrive out of order under load; storing an older "now" would make the next call credit
+-- the same interval twice. (Found by the Phase 4 load test: 557 allowed where ~118 were expected.)
+if ts > now then now = ts end
 local allowed, retry = 0, 0
 if tokens >= 1 then
   tokens = tokens - 1
