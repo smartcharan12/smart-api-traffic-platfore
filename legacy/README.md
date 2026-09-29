@@ -11,5 +11,6 @@ comparison easy without digging through commits. The tag `phase-2-complete` mark
 | `phase-2/backend/GatewayProperties.java` | `backend/src/main/java/com/smartapi/gateway/config/GatewayProperties.java` | tag `phase-2-complete` | Same file. `proxy.maxConnectAttempts` was replaced by `retry.maxAttempts`; `circuitBreaker` and `retry` sections were added. |
 | `phase-2/frontend/App.tsx` | `frontend/src/App.tsx` | tag `phase-2-complete` | Same file, now only the router and layout. The Phase 2 single page (registry tables + forms) moved unchanged to `frontend/src/pages/ServicesPage.tsx`. |
 | `phase-1/docker-compose.yml` | `docker-compose.yml` | tag `phase-2-complete` (unchanged since Phase 1) | Same file, now the full stack (Phase 4). The Phase 1 version ran PostgreSQL only. |
+| `phase-3/README.md` | `README.md` | tag `phase-3-complete` | Rewritten at the end of Phase 4 as the complete project README (the phase-by-phase version is kept here). |
 
 Remove a copy only when its replacement is verified and you decide the rollback is no longer needed.

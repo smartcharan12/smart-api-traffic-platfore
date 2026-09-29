@@ -151,6 +151,29 @@ counts, discovery cache, Prometheus metrics (Prometheus aggregates them).
 continues until the discovery TTL expires. Redis down → the gateway keeps working with local
 fallbacks (`/api/health` reports DEGRADED).
 
+## Phase 4: built
+
+- **Security** (`security/`): Spring Security with two stateless filter chains. `/gateway/**` takes an
+  optional but validated JWT; `/api/**` allows reads for any user and changes for ADMIN only. JWT
+  identity feeds rate limiting; request-size filter; CORS; security headers.
+- **Failure simulation** (`simulation/`): an admin API that drives the demo services' `/_chaos`.
+- **Packaging:** multi-stage Dockerfiles; `docker-compose.yml` runs the full stack on one private
+  network (see `docker/README.md`).
+- **CI** (`.github/workflows/ci.yml`): lint → tests (Testcontainers) → images → full-stack smoke test.
+
+```mermaid
+flowchart LR
+    B[Browser] -->|:5173| N["frontend (nginx)"]
+    N -->|/api, /gateway| G["gateway :8080"]
+    C[API clients] -->|:8080| G
+    G --> PG[(postgres)]
+    G --> R[(redis)]
+    G --> O1[orders-1] & O2[orders-2] & O3[orders-3] & PAY[payments] & RES[restaurants]
+    PR["prometheus :9090"] --> G
+    GF["grafana :3000"] --> PR
+    SETUP["demo-setup (one-shot)"] -->|register as ADMIN| G
+```
+
 ## Repository layout
 
 | Path | Purpose | Phase |
@@ -164,6 +187,7 @@ fallbacks (`/api/health` reports DEGRADED).
 | `monitoring/` | Prometheus scrape config, Grafana provisioning and dashboard | 3 |
 | `legacy/` | Pre-rewrite copies of replaced files, not built | 3 |
 | `docker/` | Dockerfiles and container configuration | 4 |
-| `tests/` | Load tests against the running stack (`LoadTest.java` in Phase 2; k6 and failure scripts in Phase 4) | 2, 4 |
+| `tests/` | Load tests against the running stack (`LoadTest.java`, strategy comparison, performance suite) | 2, 4 |
+| `.github/workflows/` | CI pipeline | 4 |
 | `docs/results/` | Raw output of every measurement quoted in the docs | 2 |
 | `docker-compose.yml` | Local infrastructure (Postgres now; full stack in Phase 4) | 1 |
