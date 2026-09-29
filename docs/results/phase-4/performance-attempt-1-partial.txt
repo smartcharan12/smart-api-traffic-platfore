@@ -1,0 +1,29 @@
+NOTE: first attempt, stopped by hand. The 5000-user run hung: the old LoadTest used two platform
+threads per simulated user and hit the OS thread limit (16912 per user) on this machine. The tool now
+uses virtual threads; see performance.txt for the complete rerun.
+
+Host: Intel(R) Core(TM) i5-1035G1 CPU @ 1.00GHz, 8 hardware threads, 7732 MB RAM
+Load average before: 2.47 2.84 1.39. Gateway, 5 demo JVMs, PostgreSQL, Redis and the load generator share this machine.
+
+== A. Concurrency scale: rate limiting OFF, cache OFF, http://localhost:8080/gateway/orders/orders (weighted RR over 3 instances)
+### A: 100 concurrent users, 5000 requests
+  total=5000 success(2xx)=5000 rateLimited(429)=0 failed(other)=0
+  wall time=8.30 s  throughput=602.2 req/s
+  latency ms: avg=165.33 p50=148.12 p95=318.16 p99=425.55 max=720.64
+  status codes: {200=5000}
+  served by: {orders-9001=2500, orders-9002=1667, orders-9003=833}
+  gateway process: CPU 32.6 s (3.93 cores on average), peak RSS 528 MB
+### A: 500 concurrent users, 5000 requests
+  total=5000 success(2xx)=5000 rateLimited(429)=0 failed(other)=0
+  wall time=6.99 s  throughput=715.5 req/s
+  latency ms: avg=674.83 p50=575.98 p95=1486.93 p99=2067.14 max=2581.69
+  status codes: {200=5000}
+  served by: {orders-9001=2500, orders-9002=1666, orders-9003=834}
+  gateway process: CPU 26.8 s (3.83 cores on average), peak RSS 599 MB
+### A: 1000 concurrent users, 5000 requests
+  total=5000 success(2xx)=5000 rateLimited(429)=0 failed(other)=0
+  wall time=6.51 s  throughput=768.1 req/s
+  latency ms: avg=1199.25 p50=1147.07 p95=2144.10 p99=2569.63 max=2853.46
+  status codes: {200=5000}
+  served by: {orders-9001=2500, orders-9002=1667, orders-9003=833}
+  gateway process: CPU 24.4 s (3.75 cores on average), peak RSS 663 MB

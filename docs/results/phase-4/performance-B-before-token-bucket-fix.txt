@@ -1,0 +1,21 @@
+NOTE: scenario B from the full run, BEFORE the token-bucket fix. B2 allowed 415 requests where a 100/min
+bucket should allow ~116: out-of-order timestamps under load double-counted refill (fixed; regression
+tests in TokenBucketRateLimiterTest and RedisRateLimiterTest). Also, B1 here ran on a gateway warmed up by
+scenario A while B2 ran on a freshly restarted one, so the throughput comparison was not fair.
+
+== B. Rate limiting: 100 concurrent users, 5000 requests, all from one client IP
+### B1: rate limiting OFF
+  total=5000 success(2xx)=5000 rateLimited(429)=0 failed(other)=0
+  wall time=3.94 s  throughput=1270.4 req/s
+  latency ms: avg=76.90 p50=70.23 p95=151.16 p99=230.40 max=340.55
+  status codes: {200=5000}
+  served by: {orders-9001=2500, orders-9002=1667, orders-9003=833}
+  gateway process: CPU 14.0 s (3.55 cores on average), peak RSS 1057 MB
+### B2: rate limiting ON (token bucket 100/min per IP, Redis)
+  total=5000 success(2xx)=415 rateLimited(429)=4585 failed(other)=0
+  wall time=9.52 s  throughput=525.0 req/s
+  latency ms: avg=188.16 p50=191.81 p95=398.78 p99=846.06 max=912.27
+  status codes: {200=415, 429=4585}
+  served by: {orders-9001=208, orders-9002=138, orders-9003=69}
+  gateway process: CPU 51.0 s (5.36 cores on average), peak RSS 564 MB
+

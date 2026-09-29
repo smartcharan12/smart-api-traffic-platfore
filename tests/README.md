@@ -14,8 +14,14 @@ next to the code: `backend/src/test/java/...` and `services/demo-service/src/tes
        --requests 1000 --concurrency 20 [--warmup 500] [--header X-User-Id:alice]
   ```
 
+- **`perf-suite.sh`**: the Phase 4 performance suite: 100 / 500 / 1000 / 5000 concurrent users,
+  and rate limiting, response cache and circuit breaker each OFF vs ON. It restarts the gateway with
+  the right configuration per scenario and records gateway CPU seconds and peak RSS from `/proc`.
+  Results: [`docs/results/phase-4/performance.txt`](../docs/results/phase-4).
+
 - **`compare-strategies.sh`**: registers `/orders-rr`, `/orders-wrr` and `/orders-lc` over the same three
   instances, then measures the distribution of each strategy sequentially and with one slow instance.
 
-Measured results are in [`docs/results/phase-2`](../docs/results/phase-2). A full load-test suite (k6,
-100 to 5000 users) and failure-simulation scripts are planned for Phase 4.
+Measured results are in [`docs/results/phase-2`](../docs/results/phase-2). Failure simulation: `scripts/demo-failure-scenario.sh`.
+Users run on Java 21 virtual threads (the first version's two platform threads per user hit the OS
+thread limit at 5000 users; see `docs/results/phase-4/performance-attempt-1-partial.txt`).

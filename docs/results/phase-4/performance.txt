@@ -1,0 +1,88 @@
+Performance results, Phase 4. Scenarios A, C, D: full suite run (tests/load/perf-suite.sh).
+Scenario B: re-measured after the token-bucket fix (SCENARIOS=B), both runs from a fresh gateway restart.
+All numbers are from one laptop shared by every component; compare rows, not absolute capacity.
+
+Host: Intel(R) Core(TM) i5-1035G1 CPU @ 1.00GHz, 8 hardware threads, 7732 MB RAM
+Load average before: 1.15 3.14 2.49. Gateway, 5 demo JVMs, PostgreSQL, Redis and the load generator share this machine.
+
+== A. Concurrency scale: rate limiting OFF, cache OFF, http://localhost:8080/gateway/orders/orders (weighted RR over 3 instances)
+### A: 100 concurrent users, 5000 requests
+  total=5000 success(2xx)=5000 rateLimited(429)=0 failed(other)=0
+  wall time=7.57 s  throughput=660.2 req/s
+  latency ms: avg=149.74 p50=127.97 p95=319.01 p99=436.92 max=680.41
+  status codes: {200=5000}
+  served by: {orders-9001=2500, orders-9002=1667, orders-9003=833}
+  gateway process: CPU 34.4 s (4.54 cores on average), peak RSS 626 MB
+### A: 500 concurrent users, 5000 requests
+  total=5000 success(2xx)=5000 rateLimited(429)=0 failed(other)=0
+  wall time=5.93 s  throughput=843.8 req/s
+  latency ms: avg=559.69 p50=522.60 p95=972.28 p99=1240.63 max=1984.28
+  status codes: {200=5000}
+  served by: {orders-9001=2500, orders-9002=1666, orders-9003=834}
+  gateway process: CPU 27.7 s (4.67 cores on average), peak RSS 792 MB
+### A: 1000 concurrent users, 5000 requests
+  total=5000 success(2xx)=5000 rateLimited(429)=0 failed(other)=0
+  wall time=5.08 s  throughput=984.3 req/s
+  latency ms: avg=866.90 p50=791.94 p95=1629.91 p99=2168.72 max=2533.66
+  status codes: {200=5000}
+  served by: {orders-9001=2500, orders-9002=1667, orders-9003=833}
+  gateway process: CPU 21.8 s (4.29 cores on average), peak RSS 788 MB
+### A: 5000 concurrent users, 25000 requests
+  total=25000 success(2xx)=25000 rateLimited(429)=0 failed(other)=0
+  wall time=21.84 s  throughput=1144.6 req/s
+  latency ms: avg=3816.31 p50=3452.98 p95=6390.83 p99=7156.37 max=9285.47
+  status codes: {200=25000}
+  served by: {orders-9001=12500, orders-9002=8333, orders-9003=4167}
+  gateway process: CPU 75.1 s (3.44 cores on average), peak RSS 1020 MB
+
+== B. Rate limiting: 100 concurrent users, 5000 requests, all from one client IP
+### B1: rate limiting OFF
+  total=5000 success(2xx)=5000 rateLimited(429)=0 failed(other)=0
+  wall time=9.51 s  throughput=525.8 req/s
+  latency ms: avg=188.31 p50=149.78 p95=479.08 p99=668.40 max=1138.50
+  status codes: {200=5000}
+  served by: {orders-9001=2500, orders-9002=1667, orders-9003=833}
+  gateway process: CPU 50.9 s (5.35 cores on average), peak RSS 564 MB
+### B2: rate limiting ON (token bucket 100/min per IP, Redis)
+  total=5000 success(2xx)=115 rateLimited(429)=4885 failed(other)=0
+  wall time=9.51 s  throughput=525.9 req/s
+  latency ms: avg=188.69 p50=198.79 p95=374.59 p99=728.88 max=862.61
+  status codes: {200=115, 429=4885}
+  served by: {orders-9001=58, orders-9002=38, orders-9003=19}
+  gateway process: CPU 52.2 s (5.48 cores on average), peak RSS 545 MB
+
+
+== C. Response cache: 100 concurrent users, 5000 requests, http://localhost:8080/gateway/restaurants/restaurants (backend sends max-age=30)
+### C1: cache OFF
+  total=5000 success(2xx)=5000 rateLimited(429)=0 failed(other)=0
+  wall time=9.18 s  throughput=544.5 req/s
+  latency ms: avg=181.57 p50=159.32 p95=365.92 p99=533.17 max=912.74
+  status codes: {200=5000}
+  served by: {restaurant-9201=5000}
+  gateway process: CPU 40.8 s (4.44 cores on average), peak RSS 593 MB
+### C2: cache ON
+  total=5000 success(2xx)=5000 rateLimited(429)=0 failed(other)=0
+  wall time=5.54 s  throughput=902.8 req/s
+  latency ms: avg=109.10 p50=95.66 p95=229.13 p99=314.11 max=460.42
+  status codes: {200=5000}
+  served by: {restaurant-9201=5000}
+  gateway process: CPU 27.5 s (4.96 cores on average), peak RSS 554 MB
+  cache counters after C2: gateway_cache_requests_total{result="HIT"} 6950.0 gateway_cache_requests_total{result="MISS"} 50.0 
+
+== D. Circuit breaker: orders instance :9003 answers after 8 s (gateway timeout 5 s); 50 users, 1500 requests
+### D1: circuit breaker OFF (retries ON)
+  total=1500 success(2xx)=1470 rateLimited(429)=0 failed(other)=30
+  wall time=30.91 s  throughput=48.5 req/s
+  latency ms: avg=884.51 p50=12.59 p95=5124.46 p99=5190.75 max=5389.36
+  status codes: {200=1470, 504=30}
+  served by: {orders-9001=884, orders-9002=586}
+  gateway process: CPU 27.2 s (0.88 cores on average), peak RSS 551 MB
+### D2: circuit breaker ON (retries ON)
+  total=1500 success(2xx)=1500 rateLimited(429)=0 failed(other)=0
+  wall time=7.69 s  throughput=195.0 req/s
+  latency ms: avg=254.70 p50=74.81 p95=383.11 p99=5207.97 max=5352.98
+  status codes: {200=1500}
+  served by: {orders-9001=900, orders-9002=600}
+  gateway process: CPU 20.6 s (2.68 cores on average), peak RSS 515 MB
+
+Load average after: 5.81 8.39 5.27

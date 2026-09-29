@@ -18,8 +18,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Minimal closed-loop HTTP load generator: C worker threads, each sends its next request as soon as
- * the previous one completes, until N requests have been sent. Reports throughput, latency
+ * Minimal closed-loop HTTP load generator: C concurrent users, each sends its next request as soon
+ * as the previous one completes, until N requests have been sent.
+ *
+ * Each user runs on a Java 21 VIRTUAL thread. The first version used two platform threads per user
+ * (worker + HTTP-client executor); at 5000 users that hit the OS thread limit on the test machine
+ * and the run hung. Virtual threads park cheaply while waiting on the network, so thousands of
+ * blocking clients cost only a few carrier threads. Reports throughput, latency
  * percentiles, status codes and, if responses contain "instance":"...", which instance served each.
  *
  * Run without compiling (Java 11+ source launcher):
@@ -59,7 +64,7 @@ public class LoadTest {
         HttpClient client = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofSeconds(5))
-                .executor(Executors.newFixedThreadPool(Math.max(2, concurrency)))
+                .executor(Executors.newVirtualThreadPerTaskExecutor())
                 .build();
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofMillis(timeoutMs)).GET();
         if (!headers.isEmpty()) {
@@ -68,19 +73,21 @@ public class LoadTest {
         HttpRequest request = builder.build();
 
         if (warmup > 0) {
-            run(client, request, warmup, concurrency);
+            run(client, request, warmup, concurrency, timeoutMs);
         }
-        Result result = run(client, request, requests, concurrency);
+        Result result = run(client, request, requests, concurrency, timeoutMs);
         result.print(request, requests, concurrency, warmup);
         System.exit(0);
     }
 
-    private static Result run(HttpClient client, HttpRequest request, int total, int concurrency) throws Exception {
+    private static Result run(HttpClient client, HttpRequest request, int total, int concurrency, long timeoutMs)
+            throws Exception {
         long[] latenciesNanos = new long[total];
+        java.util.Arrays.fill(latenciesNanos, -1);
         Map<String, LongAdder> statuses = new ConcurrentHashMap<>();
         Map<String, LongAdder> instances = new ConcurrentHashMap<>();
         AtomicInteger next = new AtomicInteger();
-        ExecutorService workers = Executors.newFixedThreadPool(concurrency);
+        ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
         long start = System.nanoTime();
         for (int w = 0; w < concurrency; w++) {
             workers.submit(() -> {
@@ -106,8 +113,19 @@ public class LoadTest {
             });
         }
         workers.shutdown();
-        workers.awaitTermination(30, TimeUnit.MINUTES);
-        return new Result(latenciesNanos, System.nanoTime() - start, statuses, instances);
+        // Hard deadline: every request has its own timeout, so this only trips if something is stuck.
+        // Unfinished requests are then reported as "unfinished" instead of hanging the run forever.
+        long deadlineMs = Math.max(60_000, (long) Math.ceil((double) total / concurrency) * timeoutMs + 60_000);
+        if (!workers.awaitTermination(deadlineMs, TimeUnit.MILLISECONDS)) {
+            workers.shutdownNow();
+        }
+        long wall = System.nanoTime() - start;
+        long unfinished = java.util.Arrays.stream(latenciesNanos).filter(l -> l < 0).count();
+        if (unfinished > 0) {
+            statuses.computeIfAbsent("unfinished", k -> new LongAdder()).add(unfinished);
+        }
+        long[] finished = java.util.Arrays.stream(latenciesNanos).filter(l -> l >= 0).toArray();
+        return new Result(finished, wall, statuses, instances);
     }
 
     private record Result(long[] latenciesNanos, long wallNanos, Map<String, LongAdder> statuses,
