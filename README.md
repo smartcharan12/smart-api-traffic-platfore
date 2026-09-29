@@ -804,11 +804,12 @@ Captured from real runs (in [docs/images](docs/images)):
 | Request logs | [phase3-request-logs.png](docs/images/phase3-request-logs.png) |
 | Grafana dashboard | [phase3-grafana.png](docs/images/phase3-grafana.png) |
 | Registry page (Phase 2) | [phase2-dashboard.png](docs/images/phase2-dashboard.png) |
+| Sign-in page (Phase 4) | [phase4-sign-in.png](docs/images/phase4-sign-in.png) |
+| Service health, signed in as ADMIN (Phase 4) | [phase4-service-health-admin.png](docs/images/phase4-service-health-admin.png) |
 
-The Phase 3 dashboard screenshots were taken before sign-in was added, so the header doesn't yet show the user.
+The Phase 3 dashboard screenshots were taken before sign-in was added, so the header doesn't yet show the user; the Phase 4 ones show it (`admin (ADMIN)`, `Sign out`).
 
 Still to capture (they need a running Docker host or a manual session):
-- the sign-in page;
 - the Service health page with the "Simulate failure" menu open;
 - `docker compose ps` with all containers healthy;
 - a terminal running `scripts/demo-failure-scenario.sh`;
